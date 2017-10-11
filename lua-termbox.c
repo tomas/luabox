@@ -3,8 +3,28 @@
 #include <stdlib.h> //malloc, free
 #include <string.h> //strlen, strncpy
 
-/* #include <termbox.h> */
-#include "/home/robert/coden/projects/github/termbox/src/termbox.h"
+#include <termbox.h>
+// #include "/home/robert/coden/projects/github/termbox/src/termbox.h"
+
+LUALIB_API void luaL_setfuncs (lua_State *L, const luaL_Reg *l, int nup) {
+  // luaL_checkversion(L);
+  luaL_checkstack(L, nup, "too many upvalues");
+  for (; l->name != NULL; l++) {
+    int i;
+    for (i = 0; i < nup; i++)
+      lua_pushvalue(L, -nup);
+    lua_pushcclosure(L, l->func, nup);
+    lua_setfield(L, -(nup + 2), l->name);
+  }
+  lua_pop(L, nup);
+}
+
+#define luaL_newlibtable(L,l)   \
+  lua_createtable(L, 0, sizeof(l)/sizeof((l)[0]) - 1)
+#define luaL_newlib(L,l)        (luaL_newlibtable(L,l), luaL_setfuncs(L,l,0))
+#define luaL_checkunsigned(L, narg) (luaL_checknumber(L, narg))
+#define luaL_len(L, idx) (lua_objlen(L, idx))
+
 
 static int l_tb_init(lua_State *L)
 {
@@ -171,8 +191,8 @@ static int l_tb_peek_event(lua_State *L)
   lua_pushnumber(L, event.type);
   lua_setfield(L, 1, "type");
 
-  lua_pushnumber(L, event.mod);
-  lua_setfield(L, 1, "mod");
+  lua_pushnumber(L, event.meta);
+  lua_setfield(L, 1, "meta");
 
   lua_pushnumber(L, event.key);
   lua_setfield(L, 1, "key");
@@ -205,8 +225,8 @@ static int l_tb_poll_event(lua_State *L)
   lua_pushnumber(L, event.type);
   lua_setfield(L, 1, "type");
 
-  lua_pushnumber(L, event.mod);
-  lua_setfield(L, 1, "mod");
+  lua_pushnumber(L, event.meta);
+  lua_setfield(L, 1, "meta");
 
   lua_pushnumber(L, event.key);
   lua_setfield(L, 1, "key");

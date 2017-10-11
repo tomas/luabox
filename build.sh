@@ -19,5 +19,5 @@ if [ ! -e termbox/build/libtermbox.a ]; then
 fi
 
 rm -f termbox.so lua-termbox.os
-$GCC $CFLAGS -I termbox/src/ -o lua-termbox.os -c -Wall -Werror -fPIC lua-termbox.c
+$GCC $CFLAGS -I /usr/include/lua5.1 -I termbox/src/ -o lua-termbox.os -c -Wall -Werror -fPIC lua-termbox.c
 $GCC -o termbox.so -shared lua-termbox.os termbox/build/libtermbox.a

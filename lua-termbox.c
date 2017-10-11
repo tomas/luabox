@@ -160,14 +160,16 @@ static int l_tb_blit(lua_State *L)
   return 0;
 }
 
-static int l_tb_select_input_mode(lua_State *L)
+static int l_tb_enable_mouse(lua_State *L)
 {
-  int mode = luaL_checkinteger(L, 1);
+  tb_enable_mouse();
+  return 0;
+}
 
-  lua_pop(L, 1);
-
-  lua_pushinteger(L, tb_select_input_mode(mode));
-  return 1;
+static int l_tb_disable_mouse(lua_State *L)
+{
+  tb_disable_mouse();
+  return 0;
 }
 
 static int l_tb_select_output_mode(lua_State *L)
@@ -293,7 +295,8 @@ static const struct luaL_Reg l_termbox[] = {
   {"put_cell",               l_tb_put_cell},
   {"change_cell",            l_tb_change_cell},
   {"blit",                   l_tb_blit},
-  {"select_input_mode",      l_tb_select_input_mode},
+  {"enable_mouse",           l_tb_enable_mouse},
+  {"disable_mouse",          l_tb_disable_mouse},
   {"select_output_mode",     l_tb_select_output_mode},
   {"peek_event",             l_tb_peek_event},
   {"poll_event",             l_tb_poll_event},
@@ -387,8 +390,6 @@ int luaopen_termbox (lua_State *L)
   REGISTER_CONSTANT(TB_KEY_BACKSPACE2);
   REGISTER_CONSTANT(TB_KEY_CTRL_8);
 
-  REGISTER_CONSTANT(TB_MOD_ALT);
-
   REGISTER_CONSTANT(TB_DEFAULT);
   REGISTER_CONSTANT(TB_BLACK);
   REGISTER_CONSTANT(TB_RED);
@@ -412,14 +413,11 @@ int luaopen_termbox (lua_State *L)
 
   REGISTER_CONSTANT(TB_HIDE_CURSOR);
 
-  REGISTER_CONSTANT(TB_INPUT_CURRENT);
-  REGISTER_CONSTANT(TB_INPUT_ESC);
-  REGISTER_CONSTANT(TB_INPUT_ALT);
-
   REGISTER_CONSTANT(TB_OUTPUT_NORMAL);
   REGISTER_CONSTANT(TB_OUTPUT_256);
   REGISTER_CONSTANT(TB_OUTPUT_216);
   REGISTER_CONSTANT(TB_OUTPUT_GRAYSCALE);
+  REGISTER_CONSTANT(TB_OUTPUT_TRUECOLOR);
 
   REGISTER_CONSTANT(TB_EOF);
   return 1;

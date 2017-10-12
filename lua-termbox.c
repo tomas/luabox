@@ -27,55 +27,46 @@
 
 static struct tb_event event;
 
-static int l_tb_init(lua_State *L)
-{
+static int l_tb_init(lua_State *L) {
   lua_pushinteger(L, tb_init());
   return 1;
 }
 
-static int l_tb_shutdown(lua_State *L)
-{
+static int l_tb_shutdown(lua_State *L) {
   tb_shutdown();
   return 0;
 }
 
-static int l_tb_width(lua_State *L)
-{
+static int l_tb_width(lua_State *L) {
   lua_pushinteger(L, tb_width());
   return 1;
 }
 
-static int l_tb_height(lua_State *L)
-{
+static int l_tb_height(lua_State *L) {
   lua_pushinteger(L, tb_height());
   return 1;
 }
 
-static int l_tb_clear(lua_State *L)
-{
+static int l_tb_clear(lua_State *L) {
   tb_clear();
   return 0;
 }
 
-static int l_tb_set_clear_attributes(lua_State *L)
-{
+static int l_tb_set_clear_attributes(lua_State *L) {
   uint16_t fg = luaL_checkunsigned(L, 1);
   uint16_t bg = luaL_checkunsigned(L, 2);
 
   lua_pop(L, 2);
-
   tb_set_clear_attributes(fg, bg);
   return 0;
 }
 
-static int l_tb_present(lua_State *L)
-{
+static int l_tb_present(lua_State *L) {
   tb_present();
   return 0;
 }
 
-static int l_tb_set_cursor(lua_State *L)
-{
+static int l_tb_set_cursor(lua_State *L) {
   int cx = luaL_checkinteger(L, 1);
   int cy = luaL_checkinteger(L, 2);
 
@@ -85,9 +76,7 @@ static int l_tb_set_cursor(lua_State *L)
   return 0;
 }
 
-
-static int l_tb_print(lua_State *L)
-{
+static int l_tb_print(lua_State *L) {
   int x = luaL_checkinteger(L, 1);
   int y = luaL_checkinteger(L, 2);
   int fg = luaL_checkinteger(L, 3);
@@ -99,8 +88,7 @@ static int l_tb_print(lua_State *L)
   return 1;
 }
 
-static int l_tb_printf(lua_State *L)
-{
+static int l_tb_printf(lua_State *L) {
   int x = luaL_checkinteger(L, 1);
   int y = luaL_checkinteger(L, 2);
   int fg = luaL_checkinteger(L, 3);
@@ -129,12 +117,9 @@ static int l_tb_printf(lua_State *L)
   return 1;
 }
 
-
-static int l_tb_put_cell(lua_State *L)
-{
+static int l_tb_put_cell(lua_State *L) {
   int x = luaL_checkinteger(L, 1);
   int y = luaL_checkinteger(L, 2);
-
   luaL_checktype(L, 3, LUA_TTABLE);
 
 /* TODO: allow less than 3 members by default values */
@@ -150,14 +135,11 @@ static int l_tb_put_cell(lua_State *L)
   };
 
   lua_pop(L, 6);
-
   tb_put_cell(x, y, &cell);
-
   return 0;
 }
 
-static int l_tb_change_cell(lua_State* L)
-{
+static int l_tb_change_cell(lua_State* L) {
   int x       = luaL_checkinteger(L, 1);
   int y       = luaL_checkinteger(L, 2);
   char ch     = luaL_checkstring(L, 3)[0];
@@ -170,8 +152,7 @@ static int l_tb_change_cell(lua_State* L)
   return 0;
 }
 
-static int l_tb_blit(lua_State *L)
-{
+static int l_tb_blit(lua_State *L) {
   int x = luaL_checkinteger(L, 1);
   int y = luaL_checkinteger(L, 2);
   int w = luaL_checkinteger(L, 3);
@@ -199,70 +180,69 @@ static int l_tb_blit(lua_State *L)
   }
 
   lua_pop(L, 5);
-
   tb_blit(x, y, w, h, cells);
 
   free(cells);
   return 0;
 }
 
-static int l_tb_enable_mouse(lua_State *L)
-{
+static int l_tb_enable_mouse(lua_State *L) {
   tb_enable_mouse();
   return 0;
 }
 
-static int l_tb_disable_mouse(lua_State *L)
-{
+static int l_tb_disable_mouse(lua_State *L) {
   tb_disable_mouse();
   return 0;
 }
 
-static int l_tb_select_output_mode(lua_State *L)
-{
+static int l_tb_select_output_mode(lua_State *L) {
   int mode = luaL_checkinteger(L, 1);
 
   lua_pop(L, 1);
-
   lua_pushinteger(L, tb_select_output_mode(mode));
   return 1;
 }
 
-static int l_tb_peek_event(lua_State *L)
-{
+void populate_event(lua_State *L) {
+  lua_pushnumber(L, event.type);
+  lua_setfield(L, 1, "type");
+
+  lua_pushnumber(L, event.key);
+  lua_setfield(L, 1, "key");
+
+  lua_pushnumber(L, event.meta);
+  lua_setfield(L, 1, "meta");
+
+  if (event.type == TB_EVENT_MOUSE) {
+    lua_pushnumber(L, event.x);
+    lua_setfield(L, 1, "x");
+
+    lua_pushnumber(L, event.y);
+    lua_setfield(L, 1, "y");
+
+  } else if (event.type == TB_EVENT_KEY) {
+    char string[2] = {event.ch,'\0'};
+    string[0] = event.ch;
+
+    lua_pushstring(L, string);
+    lua_setfield(L, 1, "ch");
+
+  } else if (event.type == TB_EVENT_RESIZE) {
+    lua_pushnumber(L, event.w);
+    lua_setfield(L, 1, "w");
+
+    lua_pushnumber(L, event.h);
+    lua_setfield(L, 1, "h");
+  }
+}
+
+static int l_tb_peek_event(lua_State *L) {
   luaL_checktype(L, 1, LUA_TTABLE);
   int timeout = luaL_checkinteger(L, 2);
 
   int ret = tb_peek_event(&event, timeout);
-
-  lua_pushnumber(L, event.type);
-  lua_setfield(L, 1, "type");
-
-  lua_pushnumber(L, event.meta);
-  lua_setfield(L, 1, "meta");
-
-  lua_pushnumber(L, event.key);
-  lua_setfield(L, 1, "key");
-
-  lua_pushnumber(L, event.w);
-  lua_setfield(L, 1, "w");
-
-  lua_pushnumber(L, event.h);
-  lua_setfield(L, 1, "h");
-
-  if (event.type == TB_EVENT_MOUSE) {
-    lua_pushnumber(L, event.x);
-    lua_setfield(L, 1, "x");
-
-    lua_pushnumber(L, event.y);
-    lua_setfield(L, 1, "y");
-  } else if (event.type == TB_EVENT_KEY) {
-    char string[2] = {event.ch,'\0'};
-    string[0] = event.ch;
-
-    lua_pushstring(L, string);
-    lua_setfield(L, 1, "ch");
-  }
+  populate_event(L);
 
   lua_pop(L, 2);
   lua_pushinteger(L, ret);
@@ -270,71 +250,35 @@ static int l_tb_peek_event(lua_State *L)
   return 1;
 }
 
-static int l_tb_poll_event(lua_State *L)
-{
+static int l_tb_poll_event(lua_State *L){
   luaL_checktype(L, 1, LUA_TTABLE);
 
   int ret = tb_poll_event(&event);
-
-  lua_pushnumber(L, event.type);
-  lua_setfield(L, 1, "type");
-
-  lua_pushnumber(L, event.meta);
-  lua_setfield(L, 1, "meta");
-
-  lua_pushnumber(L, event.key);
-  lua_setfield(L, 1, "key");
-
-  lua_pushnumber(L, event.w);
-  lua_setfield(L, 1, "w");
-
-  lua_pushnumber(L, event.h);
-  lua_setfield(L, 1, "h");
-
-  if (event.type == TB_EVENT_MOUSE) {
-    lua_pushnumber(L, event.x);
-    lua_setfield(L, 1, "x");
-
-    lua_pushnumber(L, event.y);
-    lua_setfield(L, 1, "y");
-
-  } else if (event.type == TB_EVENT_KEY) {
-    char string[2] = {event.ch,'\0'};
-    string[0] = event.ch;
-
-    lua_pushstring(L, string);
-    lua_setfield(L, 1, "ch");
-  }
+  populate_event(L);
 
   lua_pop(L, 1);
   lua_pushinteger(L, ret);
-
   return 1;
 }
 
-static int l_tb_utf8_char_length(lua_State *L)
-{
+static int l_tb_utf8_char_length(lua_State *L) {
   char c = luaL_checkstring(L, 1)[0];
 
   lua_pop(L, 1);
-
   lua_pushinteger(L, tb_utf8_char_length(c));
   return 1;
 }
 
-static int l_tb_utf8_char_to_unicode(lua_State *L)
-{
+static int l_tb_utf8_char_to_unicode(lua_State *L) {
   uint32_t *out = (uint32_t*)(uintptr_t)luaL_checkunsigned(L, 1);
   const char *c = luaL_checkstring(L, 2);
 
   lua_pop(L, 2);
-
   lua_pushinteger(L, tb_utf8_char_to_unicode(out, c));
   return 1;
 }
 
-static int l_tb_utf8_unicode_to_char(lua_State *L)
-{
+static int l_tb_utf8_unicode_to_char(lua_State *L) {
   uint32_t *out = (uint32_t*)(uintptr_t)luaL_checkunsigned(L, 1);
   const char *c = luaL_checkstring(L, 2);
 
@@ -380,8 +324,7 @@ static const struct luaL_Reg l_termbox[] = {
   free(name); \
 }
 
-int luaopen_termbox (lua_State *L)
-{
+int luaopen_termbox (lua_State *L) {
   luaL_newlib(L, l_termbox);
 
   REGISTER_CONSTANT(TB_KEY_F1);
@@ -502,4 +445,3 @@ int luaopen_termbox (lua_State *L)
   REGISTER_CONSTANT(TB_EOF);
   return 1;
 }
-

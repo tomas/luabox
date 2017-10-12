@@ -1,4 +1,4 @@
-tb = require "termbox"
+local tb = require "termbox"
 
 if not tb.init() then
   print('tb_init failed.')
@@ -13,30 +13,30 @@ local fg = tb.DEFAULT
 tb.print((w/2)-6, h/2, bg, fg, "Hello click.")
 tb.present()
 
-t = {}
+ev = {}
 clicks = 0
 tb.enable_mouse()
 
 repeat
-  ev = tb.poll_event(t)
+  local t = tb.poll_event(ev)
 
-  if ev == tb.EVENT_KEY then
-    if t.ch == 'q' or t.key == tb.CTRL_C then
+  if t == tb.EVENT_KEY then
+    if ev.ch == 'q' or ev.key == tb.KEY_ESC or ev.key == tb.KEY_CTRL_C then
       break
     end
 
-  elseif ev == tb.EVENT_RESIZE then
+  elseif t == tb.EVENT_RESIZE then
     tb.clear()
-    w = tb.width()
-    h = tb.height()
+    w = ev.w
+    h = ev.h
 
     tb.printf((w/2)-10, h/2, bg, fg, "Window resized to: %dx%d", w, h)
 
-  elseif ev == tb.EVENT_MOUSE then
+  elseif t == tb.EVENT_MOUSE then
 
-    if t.key == tb.KEY_MOUSE_LEFT then
+    if ev.key == tb.KEY_MOUSE_LEFT then
       clicks = clicks + 1
-      tb.printf((w/2)-10, h/2, bg, fg, "Click number %d! (%d, %d)", clicks, t.x, t.y)
+      tb.printf((w/2)-10, h/2, bg, fg, "Click number %d! (%d, %d)", clicks, ev.x, ev.y)
     end
   end
 

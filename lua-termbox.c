@@ -1,12 +1,12 @@
 #include <lua.h>
 #include <lauxlib.h>
-#include <stdlib.h> //malloc, free
-#include <string.h> //strlen, strncpy
+#include <stdlib.h> // malloc, free
+#include <string.h> // strlen, strncpy
 #include <termbox.h>
 #include "util.h"
 
 #if defined(LUA_VERSION_NUM) && LUA_VERSION_NUM == 501
-  LUALIB_API void luaL_setfuncs (lua_State *L, const luaL_Reg *l, int nup) {
+  LUALIB_API void luaL_setfuncs(lua_State *L, const luaL_Reg *l, int nup) {
     // luaL_checkversion(L);
     luaL_checkstack(L, nup, "too many upvalues");
     for (; l->name != NULL; l++) {
@@ -71,7 +71,6 @@ static int l_tb_set_cursor(lua_State *L) {
   int cy = luaL_checkinteger(L, 2);
 
   lua_pop(L, 2);
-
   tb_set_cursor(cx, cy);
   return 0;
 }
@@ -97,7 +96,7 @@ static int l_tb_printf(lua_State *L) {
 
   int buflen = strlen(fmt);   // initial buffer length
   int total  = lua_gettop(L); // total arguments passed
-  int remain = total - 5; // remaning arguments in stack
+  int remain = total - 5;     // remaning arguments in stack
 
   char * arr[remain];
   // char ** arr = calloc(remain, sizeof(char *));
@@ -123,7 +122,6 @@ static int l_tb_put_cell(lua_State *L) {
   luaL_checktype(L, 3, LUA_TTABLE);
 
 /* TODO: allow less than 3 members by default values */
-
   lua_getfield(L, 3, "ch");
   lua_getfield(L, 3, "fg");
   lua_getfield(L, 3, "bg");
@@ -147,8 +145,6 @@ static int l_tb_change_cell(lua_State* L) {
   uint16_t bg = luaL_checkunsigned(L, 5);
 
   lua_pop(L, 5);
-
-  tb_change_cell(x, y, ch, fg, bg);
   return 0;
 }
 
@@ -164,7 +160,7 @@ static int l_tb_blit(lua_State *L) {
   struct tb_cell *cells = (struct tb_cell*)malloc(sizeof(struct tb_cell) * len);
 
   unsigned i;
-  for (i=1; i<=len; ++i) {
+  for (i = 1; i <= len; ++i) {
     lua_rawgeti(L, 5, i); // push table/cell
     luaL_checktype(L, 6, LUA_TTABLE);
 
@@ -246,7 +242,6 @@ static int l_tb_peek_event(lua_State *L) {
 
   lua_pop(L, 2);
   lua_pushinteger(L, ret);
-
   return 1;
 }
 
@@ -283,7 +278,6 @@ static int l_tb_utf8_unicode_to_char(lua_State *L) {
   const char *c = luaL_checkstring(L, 2);
 
   lua_pop(L, 2);
-
   lua_pushinteger(L, tb_utf8_char_to_unicode(out, c));
   return 1;
 }

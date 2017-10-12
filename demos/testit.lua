@@ -1,15 +1,16 @@
 tb = require "termbox"
 
-if not tb.init() then 
+if not tb.init() then
   print("FAIL: tb_init")
-  return 
+  return
 end
 
 cell = {}
 cell.ch = ' '
-cell.fg = tb.WHITE 
+cell.fg = tb.WHITE
 cell.bg = tb.GREEN
 
+tb.print(1, 1, tb.RED, tb.WHITE, "Foobar")
 tb.change_cell(5,5,'X',tb.RED,tb.WHITE) -- no return val
 
 tb.put_cell(3,2,cell)
@@ -24,7 +25,7 @@ tb.present() -- no return val
 t={}
 repeat
   et=tb.peek_event(t,1000)
-  if et==tb.EVENT_KEY then 
+  if et==tb.EVENT_KEY then
     tb.change_cell(5,5,'K',tb.WHITE,tb.YELLOW)
   elseif et==tb.EVENT_RESIZE then
     tb.change_cell(5,5,'R',tb.WHITE,tb.BLUE)
@@ -37,9 +38,9 @@ repeat
 until not et
 
 -- wait for ANY event
-tb.clear()
-tb.present()
-tb.poll_event(t)
+-- tb.clear()
+-- tb.present()
+-- tb.poll_event(t)
 
 tb.shutdown() -- no return val
 

@@ -3,6 +3,7 @@
 #include <stdlib.h> //malloc, free
 #include <string.h> //strlen, strncpy
 #include <termbox.h>
+#include "util.h"
 
 #if defined(LUA_VERSION_NUM) && LUA_VERSION_NUM == 501
   LUALIB_API void luaL_setfuncs (lua_State *L, const luaL_Reg *l, int nup) {
@@ -23,6 +24,8 @@
   #define luaL_checkunsigned(L, narg) (luaL_checknumber(L, narg))
   #define luaL_len(L, idx)            (lua_objlen(L, idx))
 #endif
+
+static struct tb_event event;
 
 static int l_tb_init(lua_State *L)
 {
@@ -81,6 +84,51 @@ static int l_tb_set_cursor(lua_State *L)
   tb_set_cursor(cx, cy);
   return 0;
 }
+
+
+static int l_tb_print(lua_State *L)
+{
+  int x = luaL_checkinteger(L, 1);
+  int y = luaL_checkinteger(L, 2);
+  int fg = luaL_checkinteger(L, 3);
+  int bg = luaL_checkinteger(L, 4);
+  const char * str = luaL_checkstring(L, 5);
+
+  int len = tb_print(x, y, fg, bg, (char *)str);
+  lua_pushinteger(L, len);
+  return 1;
+}
+
+static int l_tb_printf(lua_State *L)
+{
+  int x = luaL_checkinteger(L, 1);
+  int y = luaL_checkinteger(L, 2);
+  int fg = luaL_checkinteger(L, 3);
+  int bg = luaL_checkinteger(L, 4);
+  const char * fmt = luaL_checkstring(L, 5);
+
+  int buflen = strlen(fmt);   // initial buffer length
+  int total  = lua_gettop(L); // total arguments passed
+  int remain = total - 5; // remaning arguments in stack
+
+  char * arr[remain];
+  // char ** arr = calloc(remain, sizeof(char *));
+
+  int i = remain;
+  while (i--) {
+    arr[i] = (char *)luaL_checkstring(L, 6 + i);
+    buflen += strlen(arr[i]);
+  }
+
+  char final[buflen * 2];
+  arsprintf(final, fmt, arr);
+
+  int len = tb_print(x, y, fg, bg, final);
+  lua_pushinteger(L, len);
+
+  return 1;
+}
+
 
 static int l_tb_put_cell(lua_State *L)
 {
@@ -185,7 +233,6 @@ static int l_tb_peek_event(lua_State *L)
   luaL_checktype(L, 1, LUA_TTABLE);
   int timeout = luaL_checkinteger(L, 2);
 
-  struct tb_event event;
   int ret = tb_peek_event(&event, timeout);
 
   lua_pushnumber(L, event.type);
@@ -197,19 +244,27 @@ static int l_tb_peek_event(lua_State *L)
   lua_pushnumber(L, event.key);
   lua_setfield(L, 1, "key");
 
-  char string[2] = {event.ch,'\0'};
-  string[0] = event.ch;
-  lua_pushstring(L, string);
-  lua_setfield(L, 1, "ch");
-
   lua_pushnumber(L, event.w);
   lua_setfield(L, 1, "w");
 
   lua_pushnumber(L, event.h);
   lua_setfield(L, 1, "h");
 
-  lua_pop(L, 2);
+  if (event.type == TB_EVENT_MOUSE) {
+    lua_pushnumber(L, event.x);
+    lua_setfield(L, 1, "x");
 
+    lua_pushnumber(L, event.y);
+    lua_setfield(L, 1, "y");
+  } else if (event.type == TB_EVENT_KEY) {
+    char string[2] = {event.ch,'\0'};
+    string[0] = event.ch;
+
+    lua_pushstring(L, string);
+    lua_setfield(L, 1, "ch");
+  }
+
+  lua_pop(L, 2);
   lua_pushinteger(L, ret);
 
   return 1;
@@ -219,7 +274,6 @@ static int l_tb_poll_event(lua_State *L)
 {
   luaL_checktype(L, 1, LUA_TTABLE);
 
-  struct tb_event event;
   int ret = tb_poll_event(&event);
 
   lua_pushnumber(L, event.type);
@@ -231,19 +285,28 @@ static int l_tb_poll_event(lua_State *L)
   lua_pushnumber(L, event.key);
   lua_setfield(L, 1, "key");
 
-  char string[2] = {event.ch,'\0'};
-  string[0] = event.ch;
-  lua_pushstring(L, string);
-  lua_setfield(L, 1, "ch");
-
   lua_pushnumber(L, event.w);
   lua_setfield(L, 1, "w");
 
   lua_pushnumber(L, event.h);
   lua_setfield(L, 1, "h");
 
-  lua_pop(L, 1);
+  if (event.type == TB_EVENT_MOUSE) {
+    lua_pushnumber(L, event.x);
+    lua_setfield(L, 1, "x");
 
+    lua_pushnumber(L, event.y);
+    lua_setfield(L, 1, "y");
+
+  } else if (event.type == TB_EVENT_KEY) {
+    char string[2] = {event.ch,'\0'};
+    string[0] = event.ch;
+
+    lua_pushstring(L, string);
+    lua_setfield(L, 1, "ch");
+  }
+
+  lua_pop(L, 1);
   lua_pushinteger(L, ret);
 
   return 1;
@@ -290,6 +353,8 @@ static const struct luaL_Reg l_termbox[] = {
   {"set_clear_attributes",   l_tb_set_clear_attributes},
   {"present",                l_tb_present},
   {"set_cursor",             l_tb_set_cursor},
+  {"print",                  l_tb_print},
+  {"printf",                 l_tb_printf},
   {"put_cell",               l_tb_put_cell},
   {"change_cell",            l_tb_change_cell},
   {"blit",                   l_tb_blit},
@@ -337,10 +402,18 @@ int luaopen_termbox (lua_State *L)
   REGISTER_CONSTANT(TB_KEY_END);
   REGISTER_CONSTANT(TB_KEY_PGUP);
   REGISTER_CONSTANT(TB_KEY_PGDN);
+
   REGISTER_CONSTANT(TB_KEY_ARROW_UP);
   REGISTER_CONSTANT(TB_KEY_ARROW_DOWN);
   REGISTER_CONSTANT(TB_KEY_ARROW_LEFT);
   REGISTER_CONSTANT(TB_KEY_ARROW_RIGHT);
+
+  REGISTER_CONSTANT(TB_KEY_MOUSE_LEFT);
+  REGISTER_CONSTANT(TB_KEY_MOUSE_RIGHT);
+  REGISTER_CONSTANT(TB_KEY_MOUSE_MIDDLE);
+  REGISTER_CONSTANT(TB_KEY_MOUSE_RELEASE);
+  REGISTER_CONSTANT(TB_KEY_MOUSE_WHEEL_UP);
+  REGISTER_CONSTANT(TB_KEY_MOUSE_WHEEL_DOWN);
 
   REGISTER_CONSTANT(TB_KEY_CTRL_TILDE);
   REGISTER_CONSTANT(TB_KEY_CTRL_2);
@@ -388,6 +461,14 @@ int luaopen_termbox (lua_State *L)
   REGISTER_CONSTANT(TB_KEY_BACKSPACE2);
   REGISTER_CONSTANT(TB_KEY_CTRL_8);
 
+  REGISTER_CONSTANT(TB_META_SHIFT);
+  REGISTER_CONSTANT(TB_META_ALT);
+  REGISTER_CONSTANT(TB_META_ALTSHIFT);
+  REGISTER_CONSTANT(TB_META_CTRL);
+  REGISTER_CONSTANT(TB_META_CTRLSHIFT);
+  REGISTER_CONSTANT(TB_META_ALTCTRL);
+  REGISTER_CONSTANT(TB_META_ALTCTRLSHIFT);
+
   REGISTER_CONSTANT(TB_DEFAULT);
   REGISTER_CONSTANT(TB_BLACK);
   REGISTER_CONSTANT(TB_RED);
@@ -404,6 +485,7 @@ int luaopen_termbox (lua_State *L)
 
   REGISTER_CONSTANT(TB_EVENT_KEY);
   REGISTER_CONSTANT(TB_EVENT_RESIZE);
+  REGISTER_CONSTANT(TB_EVENT_MOUSE);
 
   REGISTER_CONSTANT(TB_EUNSUPPORTED_TERMINAL);
   REGISTER_CONSTANT(TB_EFAILED_TO_OPEN_TTY);

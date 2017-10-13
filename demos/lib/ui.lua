@@ -51,8 +51,9 @@ function Box:new(opts)
   Box.super.new(self, opts)
   self.fg       = opts.fg
   self.bg       = opts.bg
-  self.bg_char  = opts.bg_char or ' '
+  self.bg_char  = opts.bg_char or ' ' -- 0x2573 -- 0x2591
 
+  self.position = opts.position
   self.focused  = false
   self.hidden   = false
   self.parent   = nil
@@ -90,36 +91,35 @@ function Box:colors()
   return fg, bg
 end
 
--- function Box:coords()
---   if not self.parent then -- root window
---     return self.x, self.y
---   else
---     local x, y = self.x + self.padding, self.y + self.padding
---     local parent_x, parent_y = self.parent:coords()
---     return parent_x + x, parent_y + y
---   end
--- end
-
 function Box:offset()
   local x, y = self.parent:offset()
   local top, right, bottom, left = self:margin()
-  return (x + left), (y + top)
+  return math.ceil(x + left), math.ceil(y + top)
 end
 
 function Box:margin()
   local parent_w, parent_h = self.parent:size()
-  local top    = self.top >= 1 and self.top or parent_h * self.top
-  local bottom = self.bottom >= 1 and self.bottom or parent_h * self.bottom
-  local left   = self.left >= 1 and self.left or parent_w * self.left
-  local right  = self.right >= 1 and self.right or parent_w * self.right
+
+  -- position "top" is a bit unnecessary, but what the hell.
+  local top    = self.position == "bottom" and (parent_h - self.height) or (self.top >= 1 and self.top or parent_h * self.top)
+  local bottom = self.position == "top" and (parent_h - self.height) or (self.bottom >= 1 and self.bottom or parent_h * self.bottom)
+  local left   = self.position == "right" and (parent_w - self.width) or (self.left >= 1 and self.left or parent_w * self.left)
+  local right  = self.position == "right" and (parent_w - self.width) or (self.right >= 1 and self.right or parent_w * self.right)
 
   return top, right, bottom, left
 end
 
--- function Box:char(x, y, ch)
---   local offset_x, offset_y = self:offset()
---   tb.char(offset_x + x, offset_y + y, fg, bg, ch)
--- end
+function Box:char(x, y, ch)
+  local offset_x, offset_y = self:offset()
+  local fg, bg = self:colors()
+  tb.char(offset_x + x, offset_y + y, fg, bg, ch)
+end
+
+function Box:string(x, y, str)
+  local offset_x, offset_y = self:offset()
+  local fg, bg = self:colors()
+  tb.string(offset_x + x, offset_y + y, fg, bg, str)
+end
 
 function Box:size()
   local w, h
@@ -169,30 +169,30 @@ end
 function Box:render_self()
   local offset_x, offset_y = self:offset()
   local width, height = self:size()
-  local top, right, bottom, left = self:margin()
+
   local fg, bg = self:colors()
-  local lastx, lasty
+  local bg = self.focused and tb.BLACK or bg
 
-  local bg = self.focused and tb.RED or bg
+  char = type(self.bg_char) == 'number' and self.bg_char or string.byte(self.bg_char)
 
-  for x = 0, width, 1 do
-    for y = 0, height, 1 do
-      tb.char(x + offset_x, y + offset_y, fg, bg, self.bg_char)
-      lasty = y
+  for x = 0, math.ceil(width)-1, 1 do
+    for y = 0, math.ceil(height)-1, 1 do
+      -- self:char(x, y, self.bg_char)
+      tb.char(x + offset_x, y + offset_y, fg, bg, char)
     end
-    lastx = x
   end
 
-  center = math.ceil(height/2)
-  tb.string(offset_x+1, offset_y, fg, bg, string.format("%dx%d @ %dx%d [%d,%d,%d,%d] - %d -- [%d/%d]",
-    width, height, offset_x, offset_y, top, right, bottom, left, center, lastx, lasty))
+  -- center = math.ceil(height/2)
+  -- local top, right, bottom, left = self:margin()
+  -- tb.string(offset_x+1, offset_y, fg, bg, string.format("%dx%d @ %dx%d [%d,%d,%d,%d]",
+  --   width, height, offset_x, offset_y, top, right, bottom, left, center))
 end
 
 function Box:contains(x, y)
   local offset_x, offset_y = self:offset()
   local width, height = self:size()
-  if (offset_x <= x and x <= (offset_x + width)) and
-    (offset_y <= y and y <= (offset_y + height)) then
+  if (offset_x <= x and x < (offset_x + width)) and
+    (offset_y <= y and y < (offset_y + height)) then
       return true
   else
     return false
@@ -227,9 +227,13 @@ function Label:new(text, opts)
 end
 
 function Label:render_self()
-  local x, y = self:coords()
-  -- local w, h = self:rect()
+  Label.super.render_self(self)
+
+  local x, y = self:offset()
+  local width, height = self:size()
+
   local fg, bg = self:colors()
+  local fg = self.focused and tb.CYAN or fg
   tb.string(x, y, fg, bg, self.text)
 end
 
@@ -243,7 +247,7 @@ function load(opts)
 
   screen = Container({
     width = tb.width(),
-    height = tb.height()-1
+    height = tb.height()
   })
 
   window = Box({
@@ -271,7 +275,7 @@ end
 function on_resize(w, h)
   tb.resize()
   screen.width  = w
-  screen.height = h-1
+  screen.height = h
   window:trigger('resized', w, h)
 end
 

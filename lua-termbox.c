@@ -121,13 +121,17 @@ static int l_tb_char(lua_State* L) {
   int y       = luaL_checkinteger(L, 2);
   uint16_t fg = luaL_checkunsigned(L, 3);
   uint16_t bg = luaL_checkunsigned(L, 4);
-  char ch     = luaL_checkstring(L, 5)[0];
+
+  // const char * str = luaL_checkstring(L, 5);
+  // uint32_t uni;
+  // tb_utf8_char_to_unicode(&uni, str);
+
+  uint32_t ch = luaL_checkunsigned(L, 5);
 
   lua_pop(L, 5);
   tb_char(x, y, fg, bg, ch);
   return 0;
 }
-
 
 static int l_tb_string(lua_State *L) {
   int x = luaL_checkinteger(L, 1);

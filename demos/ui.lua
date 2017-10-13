@@ -11,20 +11,17 @@ if not window then
   os.exit(1)
 end
 
-local header = ui.Box({ top = 1, height = 3, bg_char = '_', bg = tb.BLUE })
+local header = ui.Box({ height = 2, bg = tb.BLUE })
 window:add(header)
 
-header:on('click', function()
-  -- header.bg = tb.RED
-end)
+local left = ui.Box({ top = 2, bottom = 1, width = 0.5, bg = tb.GREEN })
+window:add(left)
 
-local body = ui.Box({ left = 0.5, right = 1, top = 5, width = 0.5, bottom = 1, bg_char = 'x', bg = tb.GREEN })
-window:add(body)
+local right = ui.Box({ left = 0.5, top = 2, bottom = 1, width = 0.5, bg = tb.YELLOW })
+window:add(right)
 
-body:on('click', function()
-  -- body.bg = tb.RED
-end)
-
+local footer = ui.Box({ height = 1, position = "bottom", bg = tb.RED })
+window:add(footer)
 
 -- local sidebar = VBox({ x = 2, y = 3, width = 12, bg = tb.RED })
 -- window:add(sidebar)
@@ -32,8 +29,8 @@ end)
 -- local main = VBox({ x = 15, y = 3, width = 30, bg = tb.GREEN })
 -- window:add(main)
 
--- local label = Label("Foobar", { x = 1 })
--- sidebar:add(label)
+local label = Label("Unstaged", { left = 1, right = 1 })
+left:add(label)
 
 -- local clicks = 0
 -- window:on('click', function()

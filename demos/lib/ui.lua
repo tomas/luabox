@@ -51,7 +51,7 @@ function Box:new(opts)
   Box.super.new(self, opts)
   self.fg       = opts.fg
   self.bg       = opts.bg
-  self.bg_char  = opts.bg_char or ' ' -- 0x2573 -- 0x2591
+  self.bg_char  = opts.bg_char or 0x2573 -- 0x26EC -- 0x26F6 -- 0xFFEE -- 0x261B
 
   self.position = opts.position
   self.focused  = false
@@ -91,10 +91,16 @@ function Box:colors()
   return fg, bg
 end
 
-function Box:offset()
-  local x, y = self.parent:offset()
-  local top, right, bottom, left = self:margin()
-  return math.ceil(x + left), math.ceil(y + top)
+function Box:char(x, y, ch)
+  local offset_x, offset_y = self:offset()
+  local fg, bg = self:colors()
+  tb.char(offset_x + x, offset_y + y, fg, bg, ch)
+end
+
+function Box:string(x, y, str)
+  local offset_x, offset_y = self:offset()
+  local fg, bg = self:colors()
+  tb.string(offset_x + x, offset_y + y, fg, bg, str)
 end
 
 function Box:margin()
@@ -109,16 +115,10 @@ function Box:margin()
   return top, right, bottom, left
 end
 
-function Box:char(x, y, ch)
-  local offset_x, offset_y = self:offset()
-  local fg, bg = self:colors()
-  tb.char(offset_x + x, offset_y + y, fg, bg, ch)
-end
-
-function Box:string(x, y, str)
-  local offset_x, offset_y = self:offset()
-  local fg, bg = self:colors()
-  tb.string(offset_x + x, offset_y + y, fg, bg, str)
+function Box:offset()
+  local x, y = self.parent:offset()
+  local top, right, bottom, left = self:margin()
+  return math.ceil(x + left), math.ceil(y + top)
 end
 
 function Box:size()
@@ -173,12 +173,10 @@ function Box:render_self()
   local fg, bg = self:colors()
   local bg = self.focused and tb.BLACK or bg
 
-  char = type(self.bg_char) == 'number' and self.bg_char or string.byte(self.bg_char)
-
   for x = 0, math.ceil(width)-1, 1 do
     for y = 0, math.ceil(height)-1, 1 do
       -- self:char(x, y, self.bg_char)
-      tb.char(x + offset_x, y + offset_y, fg, bg, char)
+      tb.char(x + offset_x, y + offset_y, fg, bg, self.bg_char)
     end
   end
 

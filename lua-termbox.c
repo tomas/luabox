@@ -121,12 +121,19 @@ static int l_tb_char(lua_State* L) {
   int y       = luaL_checkinteger(L, 2);
   uint16_t fg = luaL_checkunsigned(L, 3);
   uint16_t bg = luaL_checkunsigned(L, 4);
+  const char * str = luaL_checkstring(L, 5);
 
-  // const char * str = luaL_checkstring(L, 5);
-  // uint32_t uni;
-  // tb_utf8_char_to_unicode(&uni, str);
+  uint32_t ch;
 
-  uint32_t ch = luaL_checkunsigned(L, 5);
+  // str might be a number (char code), a unicode string or an actual char
+  // we'll start checking with the most probable scenario: a regular char
+  if (!str[1]) {
+    ch = str[0];
+  } else if (str[1] >= '0' && str[1] <= '9') { // looks like a number
+    ch = atoi(str);
+  } else {
+    tb_utf8_char_to_unicode(&ch, str);
+  }
 
   lua_pop(L, 5);
   tb_char(x, y, fg, bg, ch);

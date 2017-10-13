@@ -29,7 +29,7 @@ window:add(footer)
 -- local main = VBox({ x = 15, y = 3, width = 30, bg = tb.GREEN })
 -- window:add(main)
 
-local label = Label("Unstaged", { left = 1, right = 1 })
+local label = Label("Tomáster of the Universe", { left = 1, right = 1 })
 left:add(label)
 
 -- local clicks = 0

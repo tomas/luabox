@@ -10,8 +10,8 @@ local h  = tb.height()
 local bg = tb.DEFAULT
 local fg = tb.DEFAULT
 
-tb.print((w/2)-6, h/2, bg, fg, "Hello click.")
-tb.present()
+tb.string((w/2)-6, h/2, bg, fg, "Hello click.")
+tb.render()
 
 ev = {}
 clicks = 0
@@ -26,21 +26,21 @@ repeat
     end
 
   elseif t == tb.EVENT_RESIZE then
-    tb.clear()
+    tb.resize()
     w = ev.w
     h = ev.h
 
-    tb.printf((w/2)-10, h/2, bg, fg, "Window resized to: %dx%d", w, h)
+    tb.stringf((w/2)-10, h/2, bg, fg, "Window resized to: %dx%d", w, h)
 
   elseif t == tb.EVENT_MOUSE then
 
     if ev.key == tb.KEY_MOUSE_LEFT then
       clicks = clicks + 1
-      tb.printf((w/2)-10, h/2, bg, fg, "Click number %d! (%d, %d)", clicks, ev.x, ev.y)
+      tb.stringf((w/2)-10, h/2, bg, fg, "Click number %d! (%d, %d)", clicks, ev.x, ev.y)
     end
   end
 
-  tb.present()
+  tb.render()
 until not ev
 
 tb.shutdown()

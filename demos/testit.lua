@@ -10,29 +10,22 @@ cell.ch = ' '
 cell.fg = tb.WHITE
 cell.bg = tb.GREEN
 
-tb.print(1, 1, tb.RED, tb.WHITE, "Foobar")
-tb.change_cell(5,5,'X',tb.RED,tb.WHITE) -- no return val
+tb.string(1, 1, tb.RED, tb.WHITE, "Foobar")
+tb.char(5, 5, tb.RED, tb.WHITE, 'X') -- no return val
+tb.cell(3, 2, cell)
+tb.render() -- no return val
 
-tb.put_cell(3,2,cell)
-
-cells = {}
-repeat table.insert(cells, cell) until #cells == 10
-
-tb.blit(0,7,10,1,cells) -- no return val
-
-tb.present() -- no return val
-
-t={}
+t = {}
 repeat
-  et=tb.peek_event(t,1000)
-  if et==tb.EVENT_KEY then
-    tb.change_cell(5,5,'K',tb.WHITE,tb.YELLOW)
-  elseif et==tb.EVENT_RESIZE then
-    tb.change_cell(5,5,'R',tb.WHITE,tb.BLUE)
+  et = tb.peek_event(t, 1000)
+  if et == tb.EVENT_KEY then
+    tb.char(5, 5, tb.WHITE, tb.YELLOW, 'K')
+  elseif et == tb.EVENT_RESIZE then
+    tb.char(5, 5, tb.WHITE, tb.BLUE, 'R')
   else
-    tb.change_cell(5,5,'X',tb.WHITE,tb.RED)
+    tb.char(5, 5, tb.WHITE, tb.RED, 'X')
   end
-  tb.present()
+  tb.render()
 
   if t.ch == 'q' then break end
 until not et

@@ -47,8 +47,13 @@ static int l_tb_height(lua_State *L) {
   return 1;
 }
 
-static int l_tb_clear(lua_State *L) {
-  tb_clear();
+static int l_tb_clear_screen(lua_State *L) {
+  tb_clear_screen();
+  return 0;
+}
+
+static int l_tb_clear_buffer(lua_State *L) {
+  tb_clear_buffer();
   return 0;
 }
 
@@ -61,8 +66,13 @@ static int l_tb_set_clear_attributes(lua_State *L) {
   return 0;
 }
 
-static int l_tb_present(lua_State *L) {
-  tb_present();
+static int l_tb_resize(lua_State *L) {
+  tb_resize();
+  return 0;
+}
+
+static int l_tb_render(lua_State *L) {
+  tb_render();
   return 0;
 }
 
@@ -75,19 +85,63 @@ static int l_tb_set_cursor(lua_State *L) {
   return 0;
 }
 
-static int l_tb_print(lua_State *L) {
+static int l_tb_show_cursor(lua_State *L) {
+  tb_show_cursor();
+  return 0;
+}
+
+static int l_tb_hide_cursor(lua_State *L) {
+  tb_hide_cursor();
+  return 0;
+}
+
+static int l_tb_cell(lua_State *L) {
+  int x = luaL_checkinteger(L, 1);
+  int y = luaL_checkinteger(L, 2);
+  luaL_checktype(L, 3, LUA_TTABLE);
+
+/* TODO: allow less than 3 members by default values */
+  lua_getfield(L, 3, "ch");
+  lua_getfield(L, 3, "fg");
+  lua_getfield(L, 3, "bg");
+
+  const struct tb_cell cell = {
+    .ch = luaL_checkstring(L, -3)[0],
+    .fg = luaL_checkinteger(L, -2),
+    .bg = luaL_checkinteger(L, -1),
+  };
+
+  lua_pop(L, 6);
+  tb_cell(x, y, &cell);
+  return 0;
+}
+
+static int l_tb_char(lua_State* L) {
+  int x       = luaL_checkinteger(L, 1);
+  int y       = luaL_checkinteger(L, 2);
+  uint16_t fg = luaL_checkunsigned(L, 3);
+  uint16_t bg = luaL_checkunsigned(L, 4);
+  char ch     = luaL_checkstring(L, 5)[0];
+
+  lua_pop(L, 5);
+  tb_char(x, y, fg, bg, ch);
+  return 0;
+}
+
+
+static int l_tb_string(lua_State *L) {
   int x = luaL_checkinteger(L, 1);
   int y = luaL_checkinteger(L, 2);
   int fg = luaL_checkinteger(L, 3);
   int bg = luaL_checkinteger(L, 4);
   const char * str = luaL_checkstring(L, 5);
 
-  int len = tb_print(x, y, fg, bg, (char *)str);
+  int len = tb_string(x, y, fg, bg, (char *)str);
   lua_pushinteger(L, len);
   return 1;
 }
 
-static int l_tb_printf(lua_State *L) {
+static int l_tb_stringf(lua_State *L) {
   int x = luaL_checkinteger(L, 1);
   int y = luaL_checkinteger(L, 2);
   int fg = luaL_checkinteger(L, 3);
@@ -110,76 +164,10 @@ static int l_tb_printf(lua_State *L) {
   char final[buflen * 2];
   arsprintf(final, fmt, arr);
 
-  int len = tb_print(x, y, fg, bg, final);
+  int len = tb_string(x, y, fg, bg, final);
   lua_pushinteger(L, len);
 
   return 1;
-}
-
-static int l_tb_put_cell(lua_State *L) {
-  int x = luaL_checkinteger(L, 1);
-  int y = luaL_checkinteger(L, 2);
-  luaL_checktype(L, 3, LUA_TTABLE);
-
-/* TODO: allow less than 3 members by default values */
-  lua_getfield(L, 3, "ch");
-  lua_getfield(L, 3, "fg");
-  lua_getfield(L, 3, "bg");
-
-  const struct tb_cell cell = {
-    .ch = luaL_checkstring(L, -3)[0],
-    .fg = luaL_checkinteger(L, -2),
-    .bg = luaL_checkinteger(L, -1),
-  };
-
-  lua_pop(L, 6);
-  tb_put_cell(x, y, &cell);
-  return 0;
-}
-
-static int l_tb_change_cell(lua_State* L) {
-  int x       = luaL_checkinteger(L, 1);
-  int y       = luaL_checkinteger(L, 2);
-  char ch     = luaL_checkstring(L, 3)[0];
-  uint16_t fg = luaL_checkunsigned(L, 4);
-  uint16_t bg = luaL_checkunsigned(L, 5);
-
-  lua_pop(L, 5);
-  return 0;
-}
-
-static int l_tb_blit(lua_State *L) {
-  int x = luaL_checkinteger(L, 1);
-  int y = luaL_checkinteger(L, 2);
-  int w = luaL_checkinteger(L, 3);
-  int h = luaL_checkinteger(L, 4);
-
-  luaL_checktype(L, 5, LUA_TTABLE);
-  unsigned len = luaL_len(L, 5); // number of cells
-
-  struct tb_cell *cells = (struct tb_cell*)malloc(sizeof(struct tb_cell) * len);
-
-  unsigned i;
-  for (i = 1; i <= len; ++i) {
-    lua_rawgeti(L, 5, i); // push table/cell
-    luaL_checktype(L, 6, LUA_TTABLE);
-
-    lua_getfield(L, 6, "ch");
-    lua_getfield(L, 6, "fg");
-    lua_getfield(L, 6, "bg");
-
-    cells[i-1].ch = luaL_checkstring(L, -3)[0];
-    cells[i-1].fg = luaL_checkinteger(L, -2);
-    cells[i-1].bg = luaL_checkinteger(L, -1);
-
-    lua_pop(L, 4); // pop table + elements
-  }
-
-  lua_pop(L, 5);
-  tb_blit(x, y, w, h, cells);
-
-  free(cells);
-  return 0;
 }
 
 static int l_tb_enable_mouse(lua_State *L) {
@@ -287,15 +275,18 @@ static const struct luaL_Reg l_termbox[] = {
   {"shutdown",               l_tb_shutdown},
   {"width",                  l_tb_width},
   {"height",                 l_tb_height},
-  {"clear",                  l_tb_clear},
+  {"clear_screen",           l_tb_clear_screen},
+  {"clear_buffer",           l_tb_clear_buffer},
   {"set_clear_attributes",   l_tb_set_clear_attributes},
-  {"present",                l_tb_present},
+  {"resize",                 l_tb_resize},
+  {"render",                 l_tb_render},
+  {"cell",                   l_tb_cell},
+  {"char",                   l_tb_char},
+  {"string",                 l_tb_string},
+  {"stringf",                l_tb_stringf},
   {"set_cursor",             l_tb_set_cursor},
-  {"print",                  l_tb_print},
-  {"printf",                 l_tb_printf},
-  {"put_cell",               l_tb_put_cell},
-  {"change_cell",            l_tb_change_cell},
-  {"blit",                   l_tb_blit},
+  {"show_cursor",            l_tb_show_cursor},
+  {"hide_cursor",            l_tb_hide_cursor},
   {"enable_mouse",           l_tb_enable_mouse},
   {"disable_mouse",          l_tb_disable_mouse},
   {"select_output_mode",     l_tb_select_output_mode},
@@ -434,7 +425,9 @@ int luaopen_termbox (lua_State *L) {
   REGISTER_CONSTANT(TB_OUTPUT_256);
   REGISTER_CONSTANT(TB_OUTPUT_216);
   REGISTER_CONSTANT(TB_OUTPUT_GRAYSCALE);
+#ifdef WITH_TRUECOLOR
   REGISTER_CONSTANT(TB_OUTPUT_TRUECOLOR);
+#endif
 
   REGISTER_CONSTANT(TB_EOF);
   return 1;

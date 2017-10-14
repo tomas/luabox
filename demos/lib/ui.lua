@@ -51,7 +51,7 @@ function Box:new(opts)
   Box.super.new(self, opts)
   self.fg       = opts.fg
   self.bg       = opts.bg
-  self.bg_char  = opts.bg_char or 0x2573 -- 0x26EC -- 0x26F6 -- 0xFFEE -- 0x261B
+  self.bg_char  = opts.bg_char or ' ' -- or 0x2573 -- 0x26EC -- 0x26F6 -- 0xFFEE -- 0x261B
 
   self.position = opts.position
   self.focused  = false
@@ -60,13 +60,12 @@ function Box:new(opts)
   self.children = {}
   self.emitter  = Emitter:new()
 
-  self:on('click', function(x, y)
-    self.focused = true
+  -- cascade events down
+  self:on('mouse_event', function(x, y, evt, ...)
     for _, child in ipairs(self.children) do
       if child:contains(x, y) then
-        child:trigger('click', x, y)
-      else
-        child.focused = false
+        child:trigger('mouse_event', x, y, evt, ...)
+        child:trigger(evt, x, y, ...)
       end
     end
   end)
@@ -145,8 +144,8 @@ function Box:on(evt, fn)
   self.emitter:on(evt, fn)
 end
 
-function Box:trigger(evt, arg1, arg2)
-  self.emitter:emit(evt, arg1, arg2)
+function Box:trigger(evt, ...)
+  self.emitter:emit(evt, ...)
 end
 
 function Box:add(child)
@@ -216,6 +215,33 @@ function Box:remove()
   self.hidden = true
 end
 
+----------------------------------------
+
+TextBox = Box:extend()
+
+function TextBox:new(text, opts)
+  TextBox.super.new(self, opts or {})
+  self.text = text:gsub("\n", " ")
+end
+
+function TextBox:render_self()
+  local x, y = self:offset()
+  local width, height = self:size()
+
+  local fg, bg = self:colors()
+
+  local n, str, line = 0, self.text, nil
+  while string.len(str) > 0 do
+    line = str:sub(0, width)
+
+    tb.string(x, y + n, fg, bg, line)
+    n = n + 1
+    str = str:sub(width+1)
+  end
+end
+
+----------------------------------------
+
 Label = Box:extend()
 
 function Label:new(text, opts)
@@ -232,12 +258,82 @@ function Label:render_self()
 
   local fg, bg = self:colors()
   local fg = self.focused and tb.CYAN or fg
-  tb.string(x, y, fg, bg, self.text)
+  tb.string(x, y, fg, bg, self.text:sub(0, width))
 end
 
 -----------------------------------------
 
-local screen, window, focused
+List = Box:extend()
+
+function List:new(items, opts)
+  List.super.new(self, opts or {})
+  self.pos = 1
+  self.selected = -1
+  self.items = items
+  self.count = table.getn(items)
+
+  self:on('scroll', function(x, y, dir)
+    self:move(dir)
+  end)
+end
+
+function List:move(dir)
+  local res = dir + self.pos
+  local width, height = self:size()
+
+  -- ensure we stay within bounds
+  if res < 1 -- and that the don't show an empty box
+      or dir > 0 and res > (self.count - height + dir)
+        then return
+  end
+
+  self.pos = res
+end
+
+function List:render_self()
+  local x, y = self:offset()
+  local width, height = self:size()
+  local fg, bg = self:colors()
+
+  local index, item
+  for line = 0, height, 1 do
+    index = line + self.pos
+    item = self.items[index]
+    if not item then break end
+    tb.string(x, y + line, fg, index == self.selected and tb.BLACK or bg, item:sub(0, width))
+  end
+end
+
+-----------------------------------------
+
+OptionList = List:extend()
+
+function OptionList:new(items, opts)
+  OptionList.super.new(self, items, opts)
+
+  self:on('left_click', function(mouse_x, mouse_y)
+    local x, y = self:offset()
+    self:select((mouse_y - y)+1)
+  end)
+
+  self:on('double_click', function(mouse_x, mouse_y)
+    self:submit()
+  end)
+end
+
+function OptionList:select(number)
+  if (number < 1 or number > self.count) then return end
+  self.selected = number
+  self:trigger('selected', self.selected, self.items[self.selected])
+end
+
+function OptionList:submit()
+  self:trigger('submit', self.selected, self.items[self.selected])
+end
+
+-----------------------------------------
+
+local screen, window, focused, last_click
 
 function load(opts)
   if not tb.init() then return end
@@ -266,8 +362,37 @@ function on_key(key, char, meta)
   window:trigger('key', key, char, meta)
 end
 
-function on_click(button, x, y)
-  window:trigger('click', x, y)
+local mouse_events = {
+  [tb.KEY_MOUSE_LEFT]       = 'left_click',
+  [tb.KEY_MOUSE_MIDDLE]     = 'middle_click',
+  [tb.KEY_MOUSE_RIGHT]      = 'right_click',
+  -- [tb.KEY_MOUSE_RELEASE]    = 'mouseup',
+  [tb.KEY_MOUSE_WHEEL_UP]   = 'scroll_up',
+  [tb.KEY_MOUSE_WHEEL_DOWN] = 'scroll_down'
+}
+
+function on_click(key, x, y, count)
+  local event = mouse_events[key]
+  if not event then return false end
+
+  window:trigger('mouse_event', x, y, event:sub(0))
+
+  if event:match('_click') then
+    -- trigger a 'click' event for all mouse clicks
+    window:trigger('mouse_event', x, y, 'click')
+
+    if count == 2 then
+      window:trigger('mouse_event', x, y, 'double_click')
+    elseif count == 3 then
+      window:trigger('mouse_event', x, y, 'triple_click')
+    end
+
+  elseif event:match('scroll_') then
+    -- trigger a 'scroll' event for up/down
+    local dir = key == tb.KEY_MOUSE_WHEEL_UP and -2 or 2
+    window:trigger('mouse_event', x, y, 'scroll', dir)
+  end
+
 end
 
 function on_resize(w, h)
@@ -293,7 +418,7 @@ function start()
       on_key(ev.key, ev.ch, ev.meta)
 
     elseif res == tb.EVENT_MOUSE then
-      on_click(ev.key, ev.x, ev.y)
+      on_click(ev.key, ev.x, ev.y, ev.ch)
 
     elseif res == tb.EVENT_RESIZE then
       on_resize(ev.w, ev.h)
@@ -307,7 +432,13 @@ ui.unload = unload
 ui.start  = start
 ui.render = render
 
-ui.Box = Box
-ui.Label = Label
+ui.bold   = tb.bold
+ui.light  = tb.light
+
+ui.Box     = Box
+ui.Label   = Label
+ui.TextBox = TextBox
+ui.List    = List
+ui.OptionList = OptionList
 
 return ui

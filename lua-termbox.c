@@ -207,14 +207,18 @@ void populate_event(lua_State *L) {
   lua_setfield(L, 1, "key");
 
   lua_pushnumber(L, event.meta);
-  lua_setfield(L, 1, "meta");
+  lua_setfield(L, 1, "meta"); // ctrl/alt/shift or motion in mouse events
 
   if (event.type == TB_EVENT_MOUSE) {
+
     lua_pushnumber(L, event.x);
     lua_setfield(L, 1, "x");
 
     lua_pushnumber(L, event.y);
     lua_setfield(L, 1, "y");
+
+    lua_pushnumber(L, event.ch);
+    lua_setfield(L, 1, "ch"); // click count
 
   } else if (event.type == TB_EVENT_KEY) {
     char string[2] = {event.ch,'\0'};
@@ -281,6 +285,22 @@ static int l_tb_utf8_unicode_to_char(lua_State *L) {
   return 1;
 }
 
+///////////////////
+// helpers
+
+static int l_tb_bold(lua_State *L) {
+  uint16_t col = luaL_checkunsigned(L, 1);
+  lua_pushinteger(L, col | TB_BOLD);
+  return 1;
+}
+
+static int l_tb_light(lua_State *L) {
+  uint16_t col = luaL_checkunsigned(L, 1);
+  lua_pushinteger(L, col | TB_LIGHT);
+  return 1;
+}
+
+
 static const struct luaL_Reg l_termbox[] = {
   {"init",                   l_tb_init},
   {"shutdown",               l_tb_shutdown},
@@ -291,6 +311,8 @@ static const struct luaL_Reg l_termbox[] = {
   {"set_clear_attributes",   l_tb_set_clear_attributes},
   {"resize",                 l_tb_resize},
   {"render",                 l_tb_render},
+  {"bold",                   l_tb_bold},
+  {"light",                  l_tb_light},
   {"cell",                   l_tb_cell},
   {"char",                   l_tb_char},
   {"string",                 l_tb_string},
@@ -421,6 +443,7 @@ int luaopen_termbox (lua_State *L) {
   REGISTER_CONSTANT(TB_BOLD);
   REGISTER_CONSTANT(TB_UNDERLINE);
   REGISTER_CONSTANT(TB_REVERSE);
+  REGISTER_CONSTANT(TB_LIGHT);
 
   REGISTER_CONSTANT(TB_EVENT_KEY);
   REGISTER_CONSTANT(TB_EVENT_RESIZE);

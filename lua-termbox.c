@@ -32,6 +32,12 @@ static int l_tb_init(lua_State *L) {
   return 1;
 }
 
+static int l_tb_init_with(lua_State *L) {
+  uint16_t flags = luaL_checkunsigned(L, 1);
+  lua_pushinteger(L, tb_init_with(flags));
+  return 1;
+}
+
 static int l_tb_shutdown(lua_State *L) {
   tb_shutdown();
   return 0;
@@ -217,8 +223,8 @@ void populate_event(lua_State *L) {
     lua_pushnumber(L, event.y);
     lua_setfield(L, 1, "y");
 
-    lua_pushnumber(L, event.ch);
-    lua_setfield(L, 1, "ch"); // click count
+    lua_pushnumber(L, event.h);
+    lua_setfield(L, 1, "clicks"); // click count
 
   } else if (event.type == TB_EVENT_KEY) {
     char string[2] = {event.ch,'\0'};
@@ -294,15 +300,15 @@ static int l_tb_bold(lua_State *L) {
   return 1;
 }
 
-static int l_tb_light(lua_State *L) {
+static int l_tb_underline(lua_State *L) {
   uint16_t col = luaL_checkunsigned(L, 1);
-  lua_pushinteger(L, col | TB_LIGHT);
+  lua_pushinteger(L, col | TB_UNDERLINE);
   return 1;
 }
 
-
 static const struct luaL_Reg l_termbox[] = {
   {"init",                   l_tb_init},
+  {"init_with",              l_tb_init_with},
   {"shutdown",               l_tb_shutdown},
   {"width",                  l_tb_width},
   {"height",                 l_tb_height},
@@ -312,7 +318,7 @@ static const struct luaL_Reg l_termbox[] = {
   {"resize",                 l_tb_resize},
   {"render",                 l_tb_render},
   {"bold",                   l_tb_bold},
-  {"light",                  l_tb_light},
+  {"underline",              l_tb_underline},
   {"cell",                   l_tb_cell},
   {"char",                   l_tb_char},
   {"string",                 l_tb_string},
@@ -363,6 +369,8 @@ int luaopen_termbox (lua_State *L) {
   REGISTER_CONSTANT(TB_KEY_END);
   REGISTER_CONSTANT(TB_KEY_PGUP);
   REGISTER_CONSTANT(TB_KEY_PGDN);
+  REGISTER_CONSTANT(TB_KEY_PAGE_UP);
+  REGISTER_CONSTANT(TB_KEY_PAGE_DOWN);
 
   REGISTER_CONSTANT(TB_KEY_ARROW_UP);
   REGISTER_CONSTANT(TB_KEY_ARROW_DOWN);
@@ -440,25 +448,44 @@ int luaopen_termbox (lua_State *L) {
   REGISTER_CONSTANT(TB_CYAN);
   REGISTER_CONSTANT(TB_WHITE);
 
+  REGISTER_CONSTANT(TB_LIGHT_GRAY);
+  REGISTER_CONSTANT(TB_MEDIUM_GRAY);
+  REGISTER_CONSTANT(TB_LIGHT_RED);
+  REGISTER_CONSTANT(TB_LIGHT_GREEN);
+  REGISTER_CONSTANT(TB_LIGHT_YELLOW);
+  REGISTER_CONSTANT(TB_LIGHT_BLUE);
+  REGISTER_CONSTANT(TB_LIGHT_MAGENTA);
+  REGISTER_CONSTANT(TB_LIGHT_CYAN);
+  REGISTER_CONSTANT(TB_WHITE);
+
+  REGISTER_CONSTANT(TB_DARKEST_GREY);
+  REGISTER_CONSTANT(TB_DARKER_GREY);
+  REGISTER_CONSTANT(TB_DARK_GREY);
+  REGISTER_CONSTANT(TB_MEDIUM_GREY);
+  REGISTER_CONSTANT(TB_LIGHT_GREY);
+  REGISTER_CONSTANT(TB_LIGHTER_GREY);
+  REGISTER_CONSTANT(TB_LIGHTEST_GREY);
+
   REGISTER_CONSTANT(TB_BOLD);
   REGISTER_CONSTANT(TB_UNDERLINE);
   REGISTER_CONSTANT(TB_REVERSE);
-  REGISTER_CONSTANT(TB_LIGHT);
 
   REGISTER_CONSTANT(TB_EVENT_KEY);
   REGISTER_CONSTANT(TB_EVENT_RESIZE);
   REGISTER_CONSTANT(TB_EVENT_MOUSE);
 
+  REGISTER_CONSTANT(TB_INIT_ALL);
+  REGISTER_CONSTANT(TB_INIT_ALTSCREEN);
+  REGISTER_CONSTANT(TB_INIT_KEYPAD);
+  REGISTER_CONSTANT(TB_INIT_NO_CURSOR);
+  REGISTER_CONSTANT(TB_INIT_DETECT_MODE);
+
   REGISTER_CONSTANT(TB_EUNSUPPORTED_TERMINAL);
   REGISTER_CONSTANT(TB_EFAILED_TO_OPEN_TTY);
   REGISTER_CONSTANT(TB_EPIPE_TRAP_ERROR);
 
-  REGISTER_CONSTANT(TB_HIDE_CURSOR);
-
   REGISTER_CONSTANT(TB_OUTPUT_NORMAL);
   REGISTER_CONSTANT(TB_OUTPUT_256);
-  REGISTER_CONSTANT(TB_OUTPUT_216);
-  REGISTER_CONSTANT(TB_OUTPUT_GRAYSCALE);
 #ifdef WITH_TRUECOLOR
   REGISTER_CONSTANT(TB_OUTPUT_TRUECOLOR);
 #endif

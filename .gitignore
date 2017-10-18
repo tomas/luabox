@@ -1,2 +1,3 @@
-lua-termbox.os
+lua-termbox.o
+lua-termbox.a
 termbox.so

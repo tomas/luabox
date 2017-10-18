@@ -2,6 +2,8 @@ local tb = require('termbox')
 local Object  = require('demos.lib.classic')
 local Emitter = require('demos.lib.events')
 
+local screen, window, last_click
+
 function dump(o)
  if type(o) == 'table' then
   local s = '{ '
@@ -73,6 +75,10 @@ end
 
 function Box:__tostring()
   return string.format("<Box [w:%d,h:%d] [fg:%d,bg:%d]>", self.x, self.y, self.width or -1, self.height or -1, self.fg or -1, self.bg or -1)
+end
+
+function Box:focus()
+  window.focused = self
 end
 
 function Box:colors()
@@ -270,7 +276,26 @@ function List:new(items, opts)
   self.pos = 1
   self.selected = -1
   self.items = items
-  self.count = table.getn(items)
+  self.count = opts.count or table.getn(items)
+
+  self:on('left_click', function()
+    self:focus()
+  end)
+
+
+  self:on('key', function(key, ch)
+    local w, h = self:size()
+
+    if key == tb.KEY_HOME then
+      self.pos = 0
+    elseif key == tb.KEY_END then
+      self.pos = self.count - h
+    elseif key == tb.KEY_PAGE_DOWN then
+      self:move(math.floor(h/2))
+    elseif key == tb.KEY_PAGE_UP then
+      self:move(math.floor(h/2) * -1)
+    end
+  end)
 
   self:on('scroll', function(x, y, dir)
     self:move(dir)
@@ -290,6 +315,10 @@ function List:move(dir)
   self.pos = res
 end
 
+function List:get_item(number)
+  return self.items[number]
+end
+
 function List:render_self()
   local x, y = self:offset()
   local width, height = self:size()
@@ -298,7 +327,7 @@ function List:render_self()
   local index, item
   for line = 0, height, 1 do
     index = line + self.pos
-    item = self.items[index]
+    item = self:get_item(index)
     if not item then break end
     tb.string(x, y + line, fg, index == self.selected and tb.BLACK or bg, item:sub(0, width))
   end
@@ -313,7 +342,7 @@ function OptionList:new(items, opts)
 
   self:on('left_click', function(mouse_x, mouse_y)
     local x, y = self:offset()
-    self:select((mouse_y - y)+1)
+    self:select(self.pos + (mouse_y - y))
   end)
 
   self:on('double_click', function(mouse_x, mouse_y)
@@ -332,8 +361,6 @@ function OptionList:submit()
 end
 
 -----------------------------------------
-
-local screen, window, focused, last_click
 
 function load(opts)
   if not tb.init() then return end
@@ -360,6 +387,12 @@ end
 
 function on_key(key, char, meta)
   window:trigger('key', key, char, meta)
+  window:trigger('key:' .. key, key, char, meta)
+
+  if window.focused then
+    window.focused:trigger('key', key, char, meta)
+    window.focused:trigger('key:' .. key, key, char, meta)
+  end
 end
 
 local mouse_events = {
@@ -418,7 +451,7 @@ function start()
       on_key(ev.key, ev.ch, ev.meta)
 
     elseif res == tb.EVENT_MOUSE then
-      on_click(ev.key, ev.x, ev.y, ev.ch)
+      on_click(ev.key, ev.x, ev.y, ev.clicks)
 
     elseif res == tb.EVENT_RESIZE then
       on_resize(ev.w, ev.h)

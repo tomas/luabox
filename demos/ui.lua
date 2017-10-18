@@ -1,6 +1,10 @@
 local ui = require('demos.lib.ui')
 local tb = require('termbox')
 
+package.path = package.path .. ";../luajix/?.lua"
+package.cpath = package.cpath .. ";../luajix/?.so"
+local git2 = require('git2')
+
 -----------------------------------------
 
 local window = ui.load()
@@ -14,10 +18,10 @@ end
 local header = ui.Box({ height = 1, bg_char = 0x2573 })
 window:add(header)
 
-local left = ui.Box({ top = 1, bottom = 1, width = 0.5, bg = ui.light(tb.BLACK) })
+local left = ui.Box({ top = 1, bottom = 1, width = 0.8, bg = tb.DARKER_GREY })
 window:add(left)
 
-local right = ui.Box({ top = 1, left = 0.5, bottom = 1, width = 0.5, bg = tb.BLUE })
+local right = ui.Box({ top = 1, left = 0.8, bottom = 1, width = 0.5, bg = tb.DARK_GREY })
 window:add(right)
 
 text = [[
@@ -43,41 +47,150 @@ right:add(para)
 local footer = ui.Box({ height = 1, position = "bottom", bg = tb.BLACK })
 window:add(footer)
 
--- local sidebar = VBox({ x = 2, y = 3, width = 12, bg = tb.RED })
--- window:add(sidebar)
-
--- local main = VBox({ x = 15, y = 3, width = 30, bg = tb.GREEN })
--- window:add(main)
-
 local label = Label("Latest commits", { left = 1, right = 1, bg = tb.GREEN })
 left:add(label)
 
-local items = {
-  "Commit 1",
-  "Commit 2",
-  "Commit 3",
-  "Commit 4",
-  "Commit 5",
-  "Commit 6",
-  "Commit 7",
-  "Commit 8",
-  "Commit 9",
-  "Commit 10",
-  "Commit 11",
-  "Commit 12",
-  "Commit 13",
-  "Commit 14",
-  "Commit 15",
-  "Commit 16",
-}
+---------------------------
 
-local commits = ui.OptionList(items, { top = 1, left = 1, right = 1 })
+local repo, walker, ref, ref_end, oid, oid_end
+
+function load_repo(path, refpath, limit)
+  git2.init()
+
+  repo = git2.repository_open(path)
+  if not repo then return false end
+
+  local refs = refpath:split('%.%.%.')
+
+  ref = git2.reference_resolve(repo, refs[1])
+  if not ref then return false end
+
+  oid = git2.reference_oid(ref)
+
+  if #refs > 1 then
+    ref_end = git2.reference_resolve(repo, refs[2]);
+    if not ref_end then return false end
+
+    oid_end = git2.reference_oid(ref_end)
+  end
+
+  if ref_end and git2.oid_equal(oid, oid_end) then
+    print('Starting and ending refs are identical')
+    return false
+  end
+
+  local sort = bit.bor(git2.GIT_SORT_TOPOLOGICAL, git2.GIT_SORT_TIME)
+  walker = git2.revwalk_new(repo, sort, oid)
+  if not walker then
+    print('Commit walker failed to initialize.')
+    return false
+  end
+
+  return true
+  -- git2.shutdown()
+end
+
+function string:split(delimiter)
+  local result = {}
+  local from = 1
+  local delim_from, delim_to
+  while true do
+    delim_from, delim_to = self:find(delimiter, from)
+    if not delim_from then break end
+    table.insert(result, self:sub(from, delim_from - 1))
+    from = delim_to + 1
+  end
+
+  table.insert(result, self:sub(from))
+  return result
+end
+
+function fmt_ts(unix)
+  unix = unix or os.time()
+  return os.date('%Y-%m-%dT%H:%M:%SZ', unix)
+end
+
+function fmt_message(message)
+  local eol = message:find('[\r\n]$')
+  if not eol then
+    return message
+  end
+  return message:sub(1, eol - 1)
+end
+
+function format_entry(rep, ref, oid, commit)
+  local info = git2.commit_info(commit)
+  local hash = git2.oid_hash(oid)
+
+  local author, title, message;
+
+  if info.committer ~= info.author then
+    author = info.author .. " (via " .. info.committer .. ")"
+  else
+    author = info.author
+  end
+
+  if info.message and info.message:len() > 0 then
+    message = info.message
+  else
+    message = 'Unknown'
+  end
+
+  return fmt_ts(info.time) .. ' ' .. author .. ' -> ' .. message:gsub("\n", "")
+end
+
+function next_commit()
+  res = git2.revwalk_next(oid, walker)
+  if res < 0 then return end
+
+  if ref_end and git2.oid_equal(oid, oid_end) then
+   print('Processed all commits in range')
+   return
+  end
+
+  local commit = git2.commit_lookup(repo, oid)
+  if commit ~= nil then
+    return format_entry(repo, ref, oid, commit)
+  else
+    print('Failed to lookup commit from oid')
+  end
+end
+
+--------------------------
+
+max_commits = 1000
+
+local commits = ui.OptionList({}, { count = max_commits, top = 1, left = 1, right = 1 })
 left:add(commits)
 
-commits:on('selected', function(selected, item)
-  -- print(selected, item)
-  para.text = "Showing commit: " .. item
+cache = {}
+
+function commits:get_item(number)
+  if number > max_commits then return nil end
+
+  if cache[number] then
+    return cache[number]
+  else
+    local item = next_commit()
+    if item then
+      cache[number] = item
+    end
+
+    return item -- could be nil
+  end
+end
+
+commits:on('selected', function(index, string)
+  if index then
+    para.text = "Showing commit: " .. index
+  end
 end)
 
+if not load_repo('/home/tomas', 'HEAD', -1) then
+  print("Repo failed to load.")
+  os.exit(1)
+end
+
+commits:focus()
 ui.start()
 ui.unload()

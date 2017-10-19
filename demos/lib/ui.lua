@@ -249,14 +249,23 @@ function TextBox:render_self()
   local fg, bg = self:colors()
   local width, height = self:size()
 
-  local n, str, line = 0, self.text, nil
+  local n, str, line, linebreak, limit = 0, self.text, nil, nil
   while string.len(str) > 0 do
-    line = str:sub(0, width)
+    linebreak = string.find(str, '\n')
+    if linebreak then
+      line = str:sub(0, linebreak - 1)
+      limit = linebreak + 1
+    else
+      line = str:sub(0, width)
+      limit = width + 1
+    end
 
     tb.string(x, y + n, fg, bg, line)
     n = n + 1
-    str = str:sub(width+1)
+    str = str:sub(limit)
   end
+
+  self.lines = n
 end
 
 EditableTextBox = TextBox:extend()
@@ -278,7 +287,9 @@ function EditableTextBox:new(text, opts)
 end
 
 function EditableTextBox:handle_key(key, meta)
-  if key == tb.KEY_BACKSPACE2 then
+  if key == tb.KEY_ENTER then
+    self:append_char('\n')
+  elseif key == tb.KEY_BACKSPACE2 then
     self:delete_char(-1)
   elseif key == tb.KEY_DELETE then
     self:delete_char(0)
@@ -340,13 +351,49 @@ function EditableTextBox:delete_char(at)
   self.cursor_pos = self.cursor_pos + at
 end
 
+function num_matches(haystack, needle)
+  local count = 0
+  for i in string.gfind(haystack, needle) do
+     count = count + 1
+  end
+  return count
+end
+
+function EditableTextBox:get_cursor_offset(width)
+  local before = self.text:sub(0, self.cursor_pos)
+
+  local n, x, y, ln = 0, 0, 0, 0
+  local offset, limit = 0, 0
+
+  while string.len(before) > 0 do
+    ln = string.find(before, '\n')
+    if ln then
+      limit = ln + 1
+      offset = offset + ln
+    else
+      limit = width
+      offset = offset + width
+    end
+
+    before = before:sub(limit)
+    n = n + 1
+
+    if offset + width >= self.cursor_pos then
+      y = n
+      x = self.cursor_pos - offset
+      break
+    end
+  end
+
+  return x, y
+end
+
 function EditableTextBox:render_cursor()
   local x, y = self:offset()
   local fg, bg = self:colors()
   local width, height = self:size()
 
-  local cursor_y = math.floor(self.cursor_pos / math.floor(width))
-  local cursor_x = self.cursor_pos - (cursor_y * math.floor(width))
+  local cursor_x, cursor_y = self:get_cursor_offset(math.floor(width))
 
   local char = self.text:sub(self.cursor_pos+1, self.cursor_pos+1)
   tb.string(x + cursor_x, y + cursor_y, fg, tb.RED, char == '' and ' ' or char)

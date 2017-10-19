@@ -236,7 +236,11 @@ TextBox = Box:extend()
 
 function TextBox:new(text, opts)
   TextBox.super.new(self, opts or {})
-  self.text = text:gsub("\n", " ")
+  self:set_text(text)
+end
+
+function TextBox:set_text(text)
+  self.text = text -- :gsub("\n", " ")
   self.chars = self.text:len()
 end
 
@@ -259,7 +263,6 @@ EditableTextBox = TextBox:extend()
 
 function EditableTextBox:new(text, opts)
   EditableTextBox.super.new(self, text, opts or {})
-  self.cursor_pos = text:len()
 
   self:on('left_click', function()
     self:focus()
@@ -306,8 +309,9 @@ function EditableTextBox:move_cursor(dir)
   self.cursor_pos = res
 end
 
-function trim(s)
-  return s:gsub("^%s+", ""):gsub("%s+$", "")
+function EditableTextBox:set_text(text)
+  EditableTextBox.super.set_text(self, text)
+  self.cursor_pos = self.chars
 end
 
 function EditableTextBox:append_char(char)

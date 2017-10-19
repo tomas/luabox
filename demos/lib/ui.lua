@@ -17,6 +17,10 @@ function dump(o)
  end
 end
 
+function debug(obj)
+  io.stderr:write(dump(obj) .. "\n")
+end
+
 Rect = Object:extend()
 
 function Rect:new(opts)
@@ -51,12 +55,14 @@ Box = Container:extend()
 function Box:new(opts)
   opts = opts or {}
   Box.super.new(self, opts)
+
   self.fg       = opts.fg
   self.bg       = opts.bg
+  self.focus_fg = opts.focus_fg
+  self.focus_bg = opts.focus_bg
   self.bg_char  = opts.bg_char or ' ' -- or 0x2573 -- 0x26EC -- 0x26F6 -- 0xFFEE -- 0x261B
 
   self.position = opts.position
-  self.focused  = false
   self.hidden   = false
   self.parent   = nil
   self.children = {}
@@ -81,6 +87,10 @@ function Box:focus()
   window.focused = self
 end
 
+function Box:is_focused()
+  return window.focused == self
+end
+
 function Box:colors()
   local below_fg, below_bg
 
@@ -90,8 +100,8 @@ function Box:colors()
     below_fg, below_bg = self.parent:colors()
   end
 
-  local fg = self.fg == nil and below_fg or self.fg
-  local bg = self.bg == nil and below_bg or self.bg
+  local fg = self:is_focused() and self.focus_fg or (self.fg == nil and below_fg or self.fg)
+  local bg = self:is_focused() and self.focus_bg or (self.bg == nil and below_bg or self.bg)
 
   return fg, bg
 end
@@ -176,7 +186,6 @@ function Box:render_self()
   local width, height = self:size()
 
   local fg, bg = self:colors()
-  local bg = self.focused and tb.BLACK or bg
 
   for x = 0, math.ceil(width)-1, 1 do
     for y = 0, math.ceil(height)-1, 1 do
@@ -228,13 +237,13 @@ TextBox = Box:extend()
 function TextBox:new(text, opts)
   TextBox.super.new(self, opts or {})
   self.text = text:gsub("\n", " ")
+  self.chars = self.text:len()
 end
 
 function TextBox:render_self()
   local x, y = self:offset()
-  local width, height = self:size()
-
   local fg, bg = self:colors()
+  local width, height = self:size()
 
   local n, str, line = 0, self.text, nil
   while string.len(str) > 0 do
@@ -243,6 +252,106 @@ function TextBox:render_self()
     tb.string(x, y + n, fg, bg, line)
     n = n + 1
     str = str:sub(width+1)
+  end
+end
+
+EditableTextBox = TextBox:extend()
+
+function EditableTextBox:new(text, opts)
+  EditableTextBox.super.new(self, text, opts or {})
+  self.cursor_pos = text:len()
+
+  self:on('left_click', function()
+    self:focus()
+  end)
+
+  self:on('key', function(key, char, meta)
+    if char == '' then
+      self:handle_key(key, meta)
+    else
+      self:append_char(char)
+    end
+  end)
+end
+
+function EditableTextBox:handle_key(key, meta)
+  if key == tb.KEY_BACKSPACE2 then
+    self:delete_char(-1)
+  elseif key == tb.KEY_DELETE then
+    self:delete_char(0)
+  elseif key == tb.KEY_HOME then
+    self.cursor_pos = 0
+  elseif key == tb.KEY_END then
+    self.cursor_pos = self.text:len()
+  elseif key == tb.KEY_ARROW_LEFT then
+    self:move_cursor(-1)
+  elseif key == tb.KEY_ARROW_RIGHT then
+    self:move_cursor(1)
+  elseif key == tb.KEY_ARROW_DOWN then
+    local width, height = self:size()
+    self:move_cursor(math.floor(width))
+  elseif key == tb.KEY_ARROW_UP then
+    local width, height = self:size()
+    self:move_cursor(math.floor(width) * -1)
+  end
+end
+
+function EditableTextBox:move_cursor(dir)
+  local res = self.cursor_pos + dir
+
+  if res < 0 or res > self.chars then
+    return
+  end
+
+  self.cursor_pos = res
+end
+
+function trim(s)
+  return s:gsub("^%s+", ""):gsub("%s+$", "")
+end
+
+function EditableTextBox:append_char(char)
+  if self.cursor_pos == self.chars then
+    self.text = self.text .. char
+  else
+    self.text = self.text:sub(0, self.cursor_pos) .. char .. self.text:sub(self.cursor_pos+1)
+  end
+
+  self.chars = self.chars + 1
+  self.cursor_pos = self.cursor_pos + 1
+end
+
+function EditableTextBox:delete_char(at)
+  if (self.cursor_pos == 0 and at < 0) or (self.cursor_pos == self.chars and at >= 0) then
+    return
+  end
+
+  if self.cursor_pos == self.chars then
+    self.text = self.text:sub(0, self.chars + at)
+  else
+    self.text = self.text:sub(0, self.cursor_pos + at) .. self.text:sub(self.cursor_pos+(at+2))
+  end
+
+  self.chars = self.chars - 1
+  self.cursor_pos = self.cursor_pos + at
+end
+
+function EditableTextBox:render_cursor()
+  local x, y = self:offset()
+  local fg, bg = self:colors()
+  local width, height = self:size()
+
+  local cursor_y = math.floor(self.cursor_pos / math.floor(width))
+  local cursor_x = self.cursor_pos - (cursor_y * math.floor(width))
+
+  local char = self.text:sub(self.cursor_pos+1, self.cursor_pos+1)
+  tb.string(x + cursor_x, y + cursor_y, fg, tb.RED, char == '' and ' ' or char)
+end
+
+function EditableTextBox:render_self()
+  EditableTextBox.super.render_self(self)
+  if (self:is_focused()) then
+    self:render_cursor()
   end
 end
 
@@ -260,10 +369,9 @@ function Label:render_self()
   Label.super.render_self(self)
 
   local x, y = self:offset()
+  local fg, bg = self:colors()
   local width, height = self:size()
 
-  local fg, bg = self:colors()
-  local fg = self.focused and tb.CYAN or fg
   tb.string(x, y, fg, bg, self.text:sub(0, width))
 end
 
@@ -281,7 +389,6 @@ function List:new(items, opts)
   self:on('left_click', function()
     self:focus()
   end)
-
 
   self:on('key', function(key, ch)
     local w, h = self:size()
@@ -459,19 +566,18 @@ function start()
   until res == -1
 end
 
-local ui = {}
-ui.load = load
+local ui  = {}
+ui.load   = load
 ui.unload = unload
 ui.start  = start
 ui.render = render
-
 ui.bold   = tb.bold
-ui.light  = tb.light
 
-ui.Box     = Box
-ui.Label   = Label
-ui.TextBox = TextBox
-ui.List    = List
+ui.Box        = Box
+ui.Label      = Label
+ui.TextBox    = TextBox
+ui.EditableTextBox = EditableTextBox
+ui.List       = List
 ui.OptionList = OptionList
 
 return ui

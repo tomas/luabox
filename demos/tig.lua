@@ -52,58 +52,7 @@ left:add(label)
 
 ---------------------------
 
-local repo, walker, ref, ref_end, oid, oid_end
-
-function load_repo(path, refpath, limit)
-  git2.init()
-
-  repo = git2.repository_open(path)
-  if not repo then return false end
-
-  local refs = refpath:split('%.%.%.')
-
-  ref = git2.reference_resolve(repo, refs[1])
-  if not ref then return false end
-
-  oid = git2.reference_oid(ref)
-
-  if #refs > 1 then
-    ref_end = git2.reference_resolve(repo, refs[2]);
-    if not ref_end then return false end
-
-    oid_end = git2.reference_oid(ref_end)
-  end
-
-  if ref_end and git2.oid_equal(oid, oid_end) then
-    print('Starting and ending refs are identical')
-    return false
-  end
-
-  local sort = bit.bor(git2.GIT_SORT_TOPOLOGICAL, git2.GIT_SORT_TIME)
-  walker = git2.revwalk_new(repo, sort, oid)
-  if not walker then
-    print('Commit walker failed to initialize.')
-    return false
-  end
-
-  return true
-  -- git2.shutdown()
-end
-
-function string:split(delimiter)
-  local result = {}
-  local from = 1
-  local delim_from, delim_to
-  while true do
-    delim_from, delim_to = self:find(delimiter, from)
-    if not delim_from then break end
-    table.insert(result, self:sub(from, delim_from - 1))
-    from = delim_to + 1
-  end
-
-  table.insert(result, self:sub(from))
-  return result
-end
+local repo, walker, oid, ref_end, oid_end
 
 function fmt_ts(unix)
   unix = unix or os.time()
@@ -118,7 +67,7 @@ function fmt_message(message)
   return message:sub(1, eol - 1)
 end
 
-function format_entry(rep, ref, oid, commit)
+function format_entry(rep, oid, commit)
   local info = git2.commit_info(commit)
   local hash = git2.oid_hash(oid)
 
@@ -150,7 +99,7 @@ function next_commit()
 
   local commit = git2.commit_lookup(repo, oid)
   if commit ~= nil then
-    return format_entry(repo, ref, oid, commit)
+    return format_entry(repo, oid, commit)
   else
     print('Failed to lookup commit from oid')
   end
@@ -186,10 +135,17 @@ commits:on('selected', function(index, string)
   end
 end)
 
-if not load_repo('/home/tomas', 'HEAD', -1) then
+local obj = git2.load_repo('/home/tomas', 'HEAD', -1)
+if not obj then
   print("Repo failed to load.")
   os.exit(1)
 end
+
+repo    = obj.repo
+oid     = obj.oid
+oid_end = obj.oid_end
+ref_end = obj.ref_end
+walker  = git2.load_walker(repo, oid)
 
 commits:focus()
 ui.start()

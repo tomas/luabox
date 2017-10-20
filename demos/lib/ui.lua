@@ -63,6 +63,7 @@ function Box:new(opts)
   self.bg_char  = opts.bg_char or ' ' -- or 0x2573 -- 0x26EC -- 0x26F6 -- 0xFFEE -- 0x261B
 
   self.position = opts.position
+  self.changed  = true
   self.hidden   = false
   self.parent   = nil
   self.children = {}
@@ -83,8 +84,17 @@ function Box:__tostring()
   return string.format("<Box [w:%d,h:%d] [fg:%d,bg:%d]>", self.x, self.y, self.width or -1, self.height or -1, self.fg or -1, self.bg or -1)
 end
 
+function Box:unfocus()
+  self.changed = true
+end
+
 function Box:focus()
+  if self:is_focused() then return end
+  if window.focused then
+    window.focused:unfocus()
+  end
   window.focused = self
+  self.changed = true
 end
 
 function Box:is_focused()
@@ -173,6 +183,7 @@ function Box:add(child)
   child.parent = self
   table.insert(self.children, child)
   self:trigger('child_added', child)
+  self.changed = true
 end
 
 function Box:render_tree()
@@ -197,14 +208,14 @@ function Box:render_self()
   -- center = math.ceil(height/2)
   -- local top, right, bottom, left = self:margin()
   -- tb.string(offset_x+1, offset_y, fg, bg, string.format("%dx%d @ %dx%d [%d,%d,%d,%d]",
-  --   width, height, offset_x, offset_y, top, right, bottom, left, center))
+  -- width, height, offset_x, offset_y, top, right, bottom, left, center))
 end
 
 function Box:contains(x, y)
   local offset_x, offset_y = self:offset()
   local width, height = self:size()
   if (offset_x <= x and x < (offset_x + width)) and
-    (offset_y <= y and y < (offset_y + height)) then
+     (offset_y <= y and y < (offset_y + height)) then
       return true
   else
     return false
@@ -213,8 +224,9 @@ end
 
 function Box:render()
   if not self.hidden then
-    self:render_self()
+    if self.changed then self:render_self() end
     self:render_tree()
+    -- self.changed = false
   end
 end
 
@@ -252,7 +264,7 @@ function TextBox:render_self()
   local n, str, line, linebreak, limit = 0, self.text, nil, nil
   while string.len(str) > 0 do
     linebreak = string.find(str, '\n')
-    if linebreak then
+    if linebreak and linebreak <= width then
       line = str:sub(0, linebreak - 1)
       limit = linebreak + 1
     else
@@ -283,6 +295,7 @@ function EditableTextBox:new(text, opts)
     else
       self:append_char(char)
     end
+    self.changed = true
   end)
 end
 
@@ -351,36 +364,59 @@ function EditableTextBox:delete_char(at)
   self.cursor_pos = self.cursor_pos + at
 end
 
-function num_matches(haystack, needle)
-  local count = 0
-  for i in string.gfind(haystack, needle) do
-     count = count + 1
-  end
-  return count
+-- function num_matches(haystack, needle)
+--   local count = 0
+--   for i in string.gfind(haystack, needle) do
+--      count = count + 1
+--   end
+--   return count
+-- end
+
+function contains_newline(str, stop)
+  local subs = str:sub(0, stop)
+  return subs:find('\n')
 end
 
 function EditableTextBox:get_cursor_offset(width)
-  local before = self.text:sub(0, self.cursor_pos)
+  local pos = self.cursor_pos
+  local str = self.text:sub(0, self.cursor_pos)
 
-  local n, x, y, ln = 0, 0, 0, 0
-  local offset, limit = 0, 0
+  if pos < width and not contains_newline(str, width-1) then
+    return pos, 0
+  end
 
-  while string.len(before) > 0 do
-    ln = string.find(before, '\n')
-    if ln then
-      limit = ln + 1
-      offset = offset + ln
+  local x, y = 0, 0
+  local n, chars, limit, nextbreak = 0, 0, 0
+  while string.len(str) > 0 do
+
+    nextbreak = string.find(str, '\n')
+    if nextbreak and nextbreak <= width then
+      line  = str:sub(0, nextbreak-1)
+      limit = nextbreak + 1
+      chars = chars + nextbreak
     else
-      limit = width
-      offset = offset + width
+      line = str:sub(0, width)
+      limit = width + 1
+      chars = chars + width
     end
 
-    before = before:sub(limit)
     n = n + 1
+    str = str:sub(limit)
+    -- debug(string.format("chars: %d, pos: %d, width: %d, break: %d, line len: %d", chars, pos, width, nextbreak or '-1', line:len()))
 
-    if offset + width >= self.cursor_pos then
+    if chars == pos then
       y = n
-      x = self.cursor_pos - offset
+      x = 0
+      break
+    elseif (chars < pos and chars + line:len() > pos) then
+      if not contains_newline(str, pos - chars) then
+        y = n
+        x = pos - chars
+        break
+      end
+    elseif chars > pos then
+      y = n-1
+      x = line:len()
       break
     end
   end
@@ -394,9 +430,8 @@ function EditableTextBox:render_cursor()
   local width, height = self:size()
 
   local cursor_x, cursor_y = self:get_cursor_offset(math.floor(width))
-
   local char = self.text:sub(self.cursor_pos+1, self.cursor_pos+1)
-  tb.string(x + cursor_x, y + cursor_y, fg, tb.RED, char == '' and ' ' or char)
+  tb.string(x + cursor_x, y + cursor_y, fg, tb.RED, (char == '' or char == '\n') and ' ' or char)
 end
 
 function EditableTextBox:render_self()
@@ -442,6 +477,7 @@ function List:new(items, opts)
   end)
 
   self:on('key', function(key, ch)
+    self.changed = true
     local w, h = self:size()
 
     if key == tb.KEY_HOME then
@@ -456,6 +492,7 @@ function List:new(items, opts)
   end)
 
   self:on('scroll', function(x, y, dir)
+    self.changed = true
     self:move(dir)
   end)
 end
@@ -501,6 +538,7 @@ function OptionList:new(items, opts)
   self:on('left_click', function(mouse_x, mouse_y)
     local x, y = self:offset()
     self:select(self.pos + (mouse_y - y))
+    self.changed = true
   end)
 
   self:on('double_click', function(mouse_x, mouse_y)

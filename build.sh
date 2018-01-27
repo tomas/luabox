@@ -18,8 +18,11 @@ if [ ! -e termbox/build/libtermbox.a ]; then
   cd ../..
 fi
 
+# -I/usr/local/include/luajit-2.0
+luainc=$(pkg-config --cflags luajit)
+
 rm -f termbox.so lua-termbox.os
-$GCC $CFLAGS -I /usr/include/lua5.1 -I termbox/src/ -o lua-termbox.o -c -Wall -Werror -fPIC lua-termbox.c
+$GCC $CFLAGS $luainc -I termbox/src/ -o lua-termbox.o -c -Wall -Werror -fPIC lua-termbox.c
 
 echo "Building termbox.so (shared library)"
 $GCC -o termbox.so -shared lua-termbox.o termbox/build/libtermbox.a

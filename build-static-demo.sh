@@ -8,6 +8,7 @@ sh build.sh
 echo " --> Building"
 # cc -Os -s demos/ui.lua.c $archives $flags $includes -o $out
 ../luastatic/luastatic.lua demos/ui.lua $archives $includes $flags
+rm -f demos/ui.lua.c
 
 echo " --> Stripping"
 strip $out

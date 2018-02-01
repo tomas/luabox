@@ -3,6 +3,7 @@ local Object  = require('demos.lib.classic')
 local Emitter = require('demos.lib.events')
 
 local screen, window, last_click
+local box_count = 0
 
 function dump(o)
  if type(o) == 'table' then
@@ -17,11 +18,31 @@ function dump(o)
  end
 end
 
-function debug(obj)
-  io.stderr:write(dump(obj) .. "\n")
+function errwrite(str)
+  io.stderr:write(str .. "\n")
 end
 
-Rect = Object:extend()
+function debug(obj)
+  errwrite(dump(obj))
+end
+
+
+-- function num_matches(haystack, needle)
+--   local count = 0
+--   for i in string.gfind(haystack, needle) do
+--      count = count + 1
+--   end
+--   return count
+-- end
+
+function contains_newline(str, stop)
+  local subs = str:sub(0, stop)
+  return subs:find('\n')
+end
+
+-------------------------------------------------------------
+
+local Rect = Object:extend()
 
 function Rect:new(opts)
   self.width  = opts.width
@@ -50,12 +71,19 @@ function Container:colors()
   return 0, 0
 end
 
-Box = Container:extend()
+local Box = Container:extend()
+
+Box.next_id = function()
+  local curr = box_count
+  box_count = box_count + 1
+  return "box " .. curr
+end
 
 function Box:new(opts)
   opts = opts or {}
   Box.super.new(self, opts)
 
+  self.id       = opts.id or Box.next_id()
   self.fg       = opts.fg
   self.bg       = opts.bg
   self.focus_fg = opts.focus_fg
@@ -64,10 +92,17 @@ function Box:new(opts)
 
   self.position = opts.position
   self.changed  = true
-  self.hidden   = false
+  self.hidden   = opts.hidden or false
   self.parent   = nil
   self.children = {}
   self.emitter  = Emitter:new()
+
+  self:on('resized', function(new_w, new_h)
+    self.changed = true
+    for _, child in ipairs(self.children) do
+      child:trigger('resized', new_w, new_h)
+    end
+  end)
 
   -- cascade events down
   self:on('mouse_event', function(x, y, evt, ...)
@@ -81,18 +116,24 @@ function Box:new(opts)
 end
 
 function Box:__tostring()
-  return string.format("<Box [w:%d,h:%d] [fg:%d,bg:%d]>", self.x, self.y, self.width or -1, self.height or -1, self.fg or -1, self.bg or -1)
+  local w, h = self:size()
+  return string.format("<Box [w:%d,h:%d] [x:%d/y:%d] [fg:%d,bg:%d]>", w, h, self.x, self.y, self.width or -1, self.height or -1, self.fg or -1, self.bg or -1)
 end
 
 function Box:unfocus()
+  self:trigger('unfocused')
   self.changed = true
 end
 
 function Box:focus()
   if self:is_focused() then return end
+
+  -- unfocus whatever box is marked as focused
   if window.focused then
     window.focused:unfocus()
   end
+
+  self:trigger('focused')
   window.focused = self
   self.changed = true
 end
@@ -131,12 +172,18 @@ end
 function Box:margin()
   local parent_w, parent_h = self.parent:size()
 
-  -- position "top" is a bit unnecessary, but what the hell.
-  local top    = self.position == "bottom" and (parent_h - self.height) or (self.top >= 1 and self.top or parent_h * self.top)
-  local bottom = self.position == "top" and (parent_h - self.height) or (self.bottom >= 1 and self.bottom or parent_h * self.bottom)
-  local left   = self.position == "right" and (parent_w - self.width) or (self.left >= 1 and self.left or parent_w * self.left)
-  local right  = self.position == "right" and (parent_w - self.width) or (self.right >= 1 and self.right or parent_w * self.right)
+  -- raw width to calculate in case the width is %
+  local w, h = self.width, self.height
+  if w and w < 1 then w = w * parent_w end
+  if h and h < 1 then h = h * parent_h end
 
+  -- position "top" is a bit unnecessary, but what the hell.
+  local top    = self.position == "bottom" and (parent_h - h) or (self.top >= 1 and self.top or parent_h * self.top)
+  local bottom = self.position == "top" and (parent_h - h) or (self.bottom >= 1 and self.bottom or parent_h * self.bottom)
+  local left   = self.position == "right" and (parent_w - w) or (self.left >= 1 and self.left or parent_w * self.left)
+  local right  = self.position == "left" and (parent_w - w) or (self.right >= 1 and self.right or parent_w * self.right)
+
+  -- debug({ self.id .. " margin", w, h, top, right, bottom, left })
   return top, right, bottom, left
 end
 
@@ -147,6 +194,10 @@ function Box:offset()
 end
 
 function Box:size()
+  if self.hidden then
+    return 0, 0
+  end
+
   local w, h
   local parent_w, parent_h = self.parent:size()
   local top, right, bottom, left = self:margin()
@@ -155,6 +206,9 @@ function Box:size()
     w = self.width >= 1 and self.width or parent_w * self.width
   else -- width not set. parent width minus
     w = parent_w - (left + right)
+    if self.id == "right" or self.id == "detail" then
+      debug({ "width not set", self.id, parent_w, left, right, "result => ", w })
+    end
   end
 
   if self.height then -- width of parent
@@ -192,11 +246,14 @@ function Box:render_tree()
   end
 end
 
-function Box:render_self()
+function Box:clear()
   local offset_x, offset_y = self:offset()
   local width, height = self:size()
-
   local fg, bg = self:colors()
+
+  -- if self.id == "right" or self.id == "detail" then
+    debug({ "clearing " .. self.id, offset_x, width })
+  -- end
 
   for x = 0, math.ceil(width)-1, 1 do
     for y = 0, math.ceil(height)-1, 1 do
@@ -204,7 +261,10 @@ function Box:render_self()
       tb.char(x + offset_x, y + offset_y, fg, bg, self.bg_char)
     end
   end
+end
 
+function Box:render_self()
+  self:clear()
   -- center = math.ceil(height/2)
   -- local top, right, bottom, left = self:margin()
   -- tb.string(offset_x+1, offset_y, fg, bg, string.format("%dx%d @ %dx%d [%d,%d,%d,%d]",
@@ -226,7 +286,7 @@ function Box:render()
   if not self.hidden then
     if self.changed then self:render_self() end
     self:render_tree()
-    -- self.changed = false
+    self.changed = false
   end
 end
 
@@ -244,19 +304,27 @@ end
 
 ----------------------------------------
 
-TextBox = Box:extend()
+local TextBox = Box:extend()
 
 function TextBox:new(text, opts)
   TextBox.super.new(self, opts or {})
   self:set_text(text)
+
+  self:on('left_click', function()
+    self:focus()
+  end)
 end
 
 function TextBox:set_text(text)
+  self.changed = true
   self.text = text -- :gsub("\n", " ")
   self.chars = self.text:len()
 end
 
 function TextBox:render_self()
+  -- TextBox.super.clear(self)
+  self:clear()
+
   local x, y = self:offset()
   local fg, bg = self:colors()
   local width, height = self:size()
@@ -268,7 +336,15 @@ function TextBox:render_self()
       line = str:sub(0, linebreak - 1)
       limit = linebreak + 1
     else
-      line = str:sub(0, width)
+      -- check if remaining string is shorter than width
+      local diff = width - str:len()
+
+      if diff > 0 then -- yep, this is the last line
+        line = str -- .. string.rep(' ', diff) -- fill with empty spaces
+      else
+        line = str:sub(0, width)
+      end
+
       limit = width + 1
     end
 
@@ -280,14 +356,10 @@ function TextBox:render_self()
   self.lines = n
 end
 
-EditableTextBox = TextBox:extend()
+local EditableTextBox = TextBox:extend()
 
 function EditableTextBox:new(text, opts)
   EditableTextBox.super.new(self, text, opts or {})
-
-  self:on('left_click', function()
-    self:focus()
-  end)
 
   self:on('key', function(key, char, meta)
     if char == '' then
@@ -364,19 +436,6 @@ function EditableTextBox:delete_char(at)
   self.cursor_pos = self.cursor_pos + at
 end
 
--- function num_matches(haystack, needle)
---   local count = 0
---   for i in string.gfind(haystack, needle) do
---      count = count + 1
---   end
---   return count
--- end
-
-function contains_newline(str, stop)
-  local subs = str:sub(0, stop)
-  return subs:find('\n')
-end
-
 function EditableTextBox:get_cursor_offset(width)
   local pos = self.cursor_pos
   local str = self.text:sub(0, self.cursor_pos)
@@ -385,7 +444,7 @@ function EditableTextBox:get_cursor_offset(width)
     return pos, 0
   end
 
-  local x, y = 0, 0
+  local x, y, line = 0, 0, nil
   local n, chars, limit, nextbreak = 0, 0, 0
   while string.len(str) > 0 do
 
@@ -443,7 +502,7 @@ end
 
 ----------------------------------------
 
-Label = Box:extend()
+local Label = Box:extend()
 
 function Label:new(text, opts)
   Label.super.new(self, opts or {})
@@ -463,14 +522,16 @@ end
 
 -----------------------------------------
 
-List = Box:extend()
+local List = Box:extend()
 
 function List:new(items, opts)
   List.super.new(self, opts or {})
   self.pos = 1
   self.selected = -1
-  self.items = items
-  self.count = opts.count or table.getn(items)
+  self.items = items or {}
+
+  self.selection_fg = opts.selection_fg
+  self.selection_bg = opts.selection_bg or tb.BLACK
 
   self:on('left_click', function()
     self:focus()
@@ -480,10 +541,18 @@ function List:new(items, opts)
     self.changed = true
     local w, h = self:size()
 
-    if key == tb.KEY_HOME then
-      self.pos = 0
+    if key == tb.KEY_ARROW_DOWN then
+      self:move(1)
+    elseif key == tb.KEY_ARROW_UP then
+      self:move(-1)
+    elseif key == tb.KEY_HOME then
+      self:move_to(1)
     elseif key == tb.KEY_END then
-      self.pos = self.count - h
+      if self:num_items() then -- known item count
+        self:move_to(self:num_items() - h)
+      else -- unknown, just forward one page
+        self:move(math.floor(h/2))
+      end
     elseif key == tb.KEY_PAGE_DOWN then
       self:move(math.floor(h/2))
     elseif key == tb.KEY_PAGE_UP then
@@ -492,45 +561,108 @@ function List:new(items, opts)
   end)
 
   self:on('scroll', function(x, y, dir)
-    self.changed = true
     self:move(dir)
   end)
 end
 
+function List:move_to(pos)
+  self.changed = true
+  self.pos = pos
+end
+
 function List:move(dir)
-  local res = dir + self.pos
+  local result = dir + self.pos
   local width, height = self:size()
+  local nitems = self:num_items()
 
   -- ensure we stay within bounds
-  if res < 1 -- and that the don't show an empty box
-      or dir > 0 and res > (self.count - height + dir)
+  if result < 1 -- and that the don't show an empty box
+      or dir > 0 and (nitems and result > (nitems - height + dir))
         then return
   end
 
-  self.pos = res
+  self:move_to(result)
+end
+
+function List:num_items()
+  if not self.items then
+    return nil
+  end
+
+  table.getn(self.items)
+end
+
+function List:clear_items()
+  self.items = {}
+end
+
+function List:set_items(arr)
+  self.items = arr
+  self.selected = -1
+  self.changed = true
+end
+
+function List:set_item(number, item)
+  self.items[number] = item
+  self.selected = -1
+  self.changed = true
 end
 
 function List:get_item(number)
   return self.items[number]
 end
 
+function List:format_item(item)
+  return item
+end
+
+--[[
+function List:selection_color(index, our_color, parent_color)
+  if index == self.selected then
+    return our_color or parent_color
+  else
+    return parent_color
+  end
+end
+]]--
+
+local numx = 0
+
 function List:render_self()
+  self:clear()
+
+  -- numx = numx + 1
+  -- if numx > 8 then return nil end
+
   local x, y = self:offset()
   local width, height = self:size()
   local fg, bg = self:colors()
 
-  local index, item
-  for line = 0, height, 1 do
+  local index, item, formatted, diff
+  for line = 0, height-1, 1 do
     index = line + self.pos
+
     item = self:get_item(index)
     if not item then break end
-    tb.string(x, y + line, fg, index == self.selected and tb.BLACK or bg, item:sub(0, width))
+
+    formatted = self:format_item(item)
+    diff = width - formatted:len()
+    if diff > 0 then -- line is shorter than width
+      formatted = formatted .. string.rep(' ', diff)
+    else -- line is longer: cut!
+      formatted = formatted:sub(0, math.floor(width)-1) .. '$'
+    end
+
+    tb.string(x, y + line,
+      index == self.selected and self.selection_fg or fg,
+      index == self.selected and self.selection_bg or bg,
+      formatted)
   end
 end
 
 -----------------------------------------
 
-OptionList = List:extend()
+local OptionList = List:extend()
 
 function OptionList:new(items, opts)
   OptionList.super.new(self, items, opts)
@@ -538,7 +670,6 @@ function OptionList:new(items, opts)
   self:on('left_click', function(mouse_x, mouse_y)
     local x, y = self:offset()
     self:select(self.pos + (mouse_y - y))
-    self.changed = true
   end)
 
   self:on('double_click', function(mouse_x, mouse_y)
@@ -547,13 +678,16 @@ function OptionList:new(items, opts)
 end
 
 function OptionList:select(number)
-  if (number < 1 or number > self.count) then return end
+  -- check if within bounds and actually changed
+  if (number < 1 or number == self.selected or not self:get_item(number)) then return end
+
+  self.changed = true
   self.selected = number
-  self:trigger('selected', self.selected, self.items[self.selected])
+  self:trigger('selected', number, self:get_item(number))
 end
 
 function OptionList:submit()
-  self:trigger('submit', self.selected, self.items[self.selected])
+  self:trigger('submit', self.selected, self:get_item(self.selected))
 end
 
 -----------------------------------------
@@ -568,6 +702,7 @@ function load(opts)
   })
 
   window = Box({
+    id = "window",
     fg = tb.DEFAULT,
     bg = tb.DEFAULT
   })
@@ -628,6 +763,9 @@ function on_resize(w, h)
   tb.resize()
   screen.width  = w
   screen.height = h
+
+  -- trigger a 'resize' even on the main window
+  -- this will cascade down to child elements, recursively.
   window:trigger('resized', w, h)
 end
 

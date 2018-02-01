@@ -29,7 +29,6 @@ repeat
     tb.resize()
     w = ev.w
     h = ev.h
-
     tb.stringf((w/2)-10, h/2, bg, fg, "Window resized to: %dx%d", w, h)
 
   elseif t == tb.EVENT_MOUSE then

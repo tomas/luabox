@@ -2,7 +2,7 @@ local tb = require('termbox')
 local Object  = require('demos.lib.classic')
 local Emitter = require('demos.lib.events')
 
-local screen, window, last_click
+local screen, window, last_click, stopped
 local box_count = 0
 
 function dump(o)
@@ -198,7 +198,6 @@ function Box:margin()
   local left   = self.position == "right" and (parent_w - w) or (self.left >= 1 and self.left or parent_w * self.left)
   local right  = self.position == "left" and (parent_w - w) or (self.right >= 1 and self.right or parent_w * self.right)
 
-  -- debug({ self.id .. " margin", w, h, top, right, bottom, left })
   return top, right, bottom, left
 end
 
@@ -520,6 +519,11 @@ function Label:new(text, opts)
   self.text = text
 end
 
+function Label:set_text(text)
+  self.text = text
+  self.changed = true
+end
+
 function Label:render_self()
   Label.super.render_self(self)
 
@@ -537,7 +541,7 @@ local List = Box:extend()
 function List:new(items, opts)
   List.super.new(self, opts or {})
   self.pos = 1
-  self.selected = -1
+  self.selected = 0
   self.items = items or {}
 
   self.selection_fg = opts.selection_fg
@@ -608,13 +612,13 @@ end
 
 function List:set_items(arr)
   self.items = arr
-  self.selected = -1
+  self.selected = 0
   self.changed = true
 end
 
 function List:set_item(number, item)
   self.items[number] = item
-  self.selected = -1
+  self.selected = 0
   self.changed = true
 end
 
@@ -623,7 +627,7 @@ function List:get_item(number)
 end
 
 function List:format_item(item)
-  return item
+  return tostring(item)
 end
 
 --[[
@@ -636,37 +640,33 @@ function List:selection_color(index, our_color, parent_color)
 end
 ]]--
 
-local numx = 0
-
 function List:render_self()
   self:clear()
-
-  -- numx = numx + 1
-  -- if numx > 8 then return nil end
 
   local x, y = self:offset()
   local width, height = self:size()
   local fg, bg = self:colors()
-
-  -- debug({ "rendering " .. self.id, x, y, width, height })
-
+  local rounded_width = width % 1 == 0 and width or math.floor(width)+1
   local index, item, formatted, diff
+
+  -- if self.title then
+  --   self.title:set_text("Width: " .. width .. ", rounded: " .. rounded_width)
+  -- end
+
   for line = 0, height-1, 1 do
     index = line + self.pos
-
     item = self:get_item(index)
     if not item then break end
 
     formatted = self:format_item(item)
     diff = width - formatted:len()
     if diff >= 0 then -- line is shorter than width
-      formatted = formatted .. string.rep(' ', diff)
-    else -- line is longer: cut!
-      formatted = formatted:sub(0, math.floor(width)-1) .. '$'
+      formatted = formatted -- .. string.rep(' ', diff)
+    else -- line is longer, so cut!
+      formatted = formatted:sub(0, rounded_width-1) .. '$'
     end
 
     -- debug({ " --> line " .. index , formatted })
-
     tb.string(x, y + line,
       index == self.selected and self.selection_fg or fg,
       index == self.selected and self.selection_bg or bg,
@@ -681,6 +681,12 @@ local OptionList = List:extend()
 function OptionList:new(items, opts)
   OptionList.super.new(self, items, opts)
 
+  self:on('key', function(key, ch)
+    if ch == ' ' then -- space key
+      self:submit()
+    end
+  end)
+
   self:on('left_click', function(mouse_x, mouse_y)
     local x, y = self:offset()
     self:select(self.pos + (mouse_y - y))
@@ -689,6 +695,15 @@ function OptionList:new(items, opts)
   self:on('double_click', function(mouse_x, mouse_y)
     self:submit()
   end)
+end
+
+function OptionList:move(pos)
+  -- if within screen, just move selection. otherwise, do move
+  if pos == 1 or pos == -1 then
+    self:select(self.selected + pos)
+  else
+    OptionList.super.move(self, pos)
+  end
 end
 
 function OptionList:select(number)
@@ -701,7 +716,10 @@ function OptionList:select(number)
 end
 
 function OptionList:submit()
-  self:trigger('submit', self.selected, self:get_item(self.selected))
+  local item = self:get_item(self.selected)
+  if item then
+    self:trigger('submit', self.selected, item)
+  end
 end
 
 -----------------------------------------
@@ -810,8 +828,11 @@ function load(opts)
 end
 
 function unload()
-  -- window:remove()
-  tb.shutdown()
+  if window then
+    window:remove()
+    window = nil
+    tb.shutdown()
+  end
 end
 
 function on_key(key, char, meta)
@@ -859,7 +880,7 @@ function on_click(key, x, y, count)
 
   elseif event:match('scroll_') then
     -- trigger a 'scroll' event for up/down
-    local dir = key == tb.KEY_MOUSE_WHEEL_UP and -2 or 2
+    local dir = key == tb.KEY_MOUSE_WHEEL_UP and -3 or 3
     window:trigger('mouse_event', x, y, 'scroll', dir)
   end
 
@@ -896,15 +917,20 @@ function start()
     elseif res == tb.EVENT_RESIZE then
       on_resize(ev.w, ev.h)
     end
-  until res == -1
+  until stopped or res == -1
+end
+
+function stop()
+  stopped = true
 end
 
 local ui  = {}
 ui.load   = load
 ui.unload = unload
 ui.start  = start
+ui.stop   = stop
 ui.render = render
-ui.bold   = tb.bold
+-- ui.bold   = tb.bold
 
 ui.Box        = Box
 ui.Label      = Label

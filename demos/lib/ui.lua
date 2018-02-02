@@ -871,10 +871,9 @@ function on_click(key, x, y, count)
   if event:match('_click') then
     -- trigger a 'click' event for all mouse clicks
     window:trigger('mouse_event', x, y, 'click')
-
-    if count == 2 then
+    if count > 0 and count % 2 == 0 then -- four clicks in a row should count as 2 x double-click
       window:trigger('mouse_event', x, y, 'double_click')
-    elseif count == 3 then
+    elseif count > 0 and count % 3 == 0 then -- same as above, but x3
       window:trigger('mouse_event', x, y, 'triple_click')
     end
 

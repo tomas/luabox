@@ -23,6 +23,8 @@
   #define luaL_newlib(L,l)            (luaL_newlibtable(L,l), luaL_setfuncs(L,l,0))
   #define luaL_checkunsigned(L, narg) (luaL_checknumber(L, narg))
   #define luaL_len(L, idx)            (lua_objlen(L, idx))
+#elif defined(LUA_VERSION_NUM) && LUA_VERSION_NUM == 503
+  #define luaL_checkunsigned(L, narg) (luaL_checknumber(L, narg))
 #endif
 
 static struct tb_event event;

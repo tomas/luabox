@@ -120,6 +120,21 @@ function Box:__tostring()
   return string.format("<Box [w:%d,h:%d] [x:%d/y:%d] [fg:%d,bg:%d]>", w, h, self.x, self.y, self.width or -1, self.height or -1, self.fg or -1, self.bg or -1)
 end
 
+function Box:toggle(bool)
+  self.changed = true
+
+  if bool == true or bool == false then
+    self.hidden = not bool
+    return self.hidden
+  elseif self.hidden then
+    self.hidden = false
+    return true -- now shown
+  else
+    self.hidden = true
+    return false  -- not shown now
+  end
+end
+
 function Box:unfocus()
   self:trigger('unfocused')
   self.changed = true
@@ -206,9 +221,7 @@ function Box:size()
     w = self.width >= 1 and self.width or parent_w * self.width
   else -- width not set. parent width minus
     w = parent_w - (left + right)
-    if self.id == "right" or self.id == "detail" then
-      debug({ "width not set", self.id, parent_w, left, right, "result => ", w })
-    end
+    -- debug({ "width not set", self.id, parent_w, left, right, "result => ", w })
   end
 
   if self.height then -- width of parent
@@ -251,10 +264,7 @@ function Box:clear()
   local width, height = self:size()
   local fg, bg = self:colors()
 
-  -- if self.id == "right" or self.id == "detail" then
-    debug({ "clearing " .. self.id, offset_x, width })
-  -- end
-
+  -- debug({ "clearing " .. self.id, offset_x, width })
   for x = 0, math.ceil(width)-1, 1 do
     for y = 0, math.ceil(height)-1, 1 do
       -- self:char(x, y, self.bg_char)
@@ -310,7 +320,7 @@ function TextBox:new(text, opts)
   TextBox.super.new(self, opts or {})
   self:set_text(text)
 
-  self:on('left_click', function()
+  self:on('left_click', function(mouse_x, mouse_y)
     self:focus()
   end)
 end
@@ -533,7 +543,7 @@ function List:new(items, opts)
   self.selection_fg = opts.selection_fg
   self.selection_bg = opts.selection_bg or tb.BLACK
 
-  self:on('left_click', function()
+  self:on('left_click', function(mouse_x, mouse_y)
     self:focus()
   end)
 
@@ -638,6 +648,8 @@ function List:render_self()
   local width, height = self:size()
   local fg, bg = self:colors()
 
+  -- debug({ "rendering " .. self.id, x, y, width, height })
+
   local index, item, formatted, diff
   for line = 0, height-1, 1 do
     index = line + self.pos
@@ -647,11 +659,13 @@ function List:render_self()
 
     formatted = self:format_item(item)
     diff = width - formatted:len()
-    if diff > 0 then -- line is shorter than width
+    if diff >= 0 then -- line is shorter than width
       formatted = formatted .. string.rep(' ', diff)
     else -- line is longer: cut!
       formatted = formatted:sub(0, math.floor(width)-1) .. '$'
     end
+
+    -- debug({ " --> line " .. index , formatted })
 
     tb.string(x, y + line,
       index == self.selected and self.selection_fg or fg,
@@ -692,6 +706,72 @@ end
 
 -----------------------------------------
 
+local Menu = OptionList:extend()
+
+function Menu:new(items, opts)
+  Menu.super.new(self, items, opts)
+  self.hidden = true
+
+  self.max_width  = opts.max_width -- otherwise, longest element + 1
+  self.max_height = opts.max_height or 10
+
+  -- selected is triggered on left click
+  self:on('selected', function(index, item)
+    self:submit()
+  end)
+
+  -- hide menu on submit
+  -- update: no need to. window.hide_above will do this for us
+  -- self:on('submit', function(index, item)
+  --   self:toggle(false)
+  -- end)
+end
+
+function Menu:open()
+  self:toggle(true)
+end
+
+function Menu:close()
+  self:toggle(false)
+end
+
+function Menu:set_offset(x, y)
+  self.offset_x = x
+  self.offset_y = y
+end
+
+function Menu:offset()
+  if self.offset_x and self.offset_y then
+    return self.offset_x, self.offset_y
+  else
+    return Menu.super.offset(self)
+  end
+end
+
+function Menu:get_longest_item()
+  local res, formatted
+  for _, item in ipairs(self.items) do
+    formatted = self:format_item(item)
+    if not res or formatted:len() > res:len() then
+      res = formatted
+    end
+  end
+
+  return res
+end
+
+function Menu:size()
+  local w, h = self.width, table.getn(self.items)
+
+  if not w then
+    w = string.len(self:get_longest_item())
+  end
+
+  return w, h
+end
+
+-----------------------------------------
+
 function load(opts)
   if not tb.init() then return end
   tb.enable_mouse()
@@ -706,6 +786,24 @@ function load(opts)
     fg = tb.DEFAULT,
     bg = tb.DEFAULT
   })
+
+  window.show_above = function(self, item)
+    if self.above_item then
+      self:hide_above()
+    end
+    -- self:add(item)
+    self.above_item = item
+    item:open()
+  end
+
+  window.hide_above = function(self)
+    if self.above_item then
+      self.above_item:close()
+      -- self:remove(above_item)
+      self.above_item = nil
+      self:trigger('resized') -- force redraw of child elements
+    end
+  end
 
   window.parent = screen
   return window
@@ -739,7 +837,15 @@ function on_click(key, x, y, count)
   local event = mouse_events[key]
   if not event then return false end
 
-  window:trigger('mouse_event', x, y, event:sub(0))
+  if window.above_item then
+    if window.above_item:contains(x, y) then
+      window.above_item:trigger(event, x, y)
+    end
+    window:hide_above()
+    return -- we don't want to propagate
+  end
+
+  window:trigger('mouse_event', x, y, event)
 
   if event:match('_click') then
     -- trigger a 'click' event for all mouse clicks
@@ -806,5 +912,6 @@ ui.TextBox    = TextBox
 ui.EditableTextBox = EditableTextBox
 ui.List       = List
 ui.OptionList = OptionList
+ui.Menu       = Menu
 
 return ui

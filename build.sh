@@ -21,14 +21,14 @@ fi
 echo "Cleaning up"
 rm -f lua-termbox.o lua-termbox.a termbox.so
 
-# luainc=$(pkg-config --cflags luajit)
-luainc="-I/usr/local/crew/include/luajit-2.0/"
+luainc=$(pkg-config --cflags luajit)
+# luainc="-I/usr/local/crew/include/luajit-2.0/"
 
 rm -f termbox.so lua-termbox.os
 $CC $CFLAGS $luainc -I termbox/src/ -o lua-termbox.o -c -Wall -Werror -fPIC lua-termbox.c
 
-echo "Building termbox.so (shared library)"
-$CC -o termbox.so -shared lua-termbox.o termbox/build/libtermbox.a
+echo "Building lua-termbox.so (shared library)"
+$CC -o lua-termbox.so -shared lua-termbox.o termbox/build/libtermbox.a
 echo "Building lua-termbox.a (archive)"
 ar rcs lua-termbox.a lua-termbox.o
 

@@ -1,4 +1,4 @@
-local tb = require('termbox')
+local tb = require('lua-termbox')
 local Object  = require('demos.lib.classic')
 local Emitter = require('demos.lib.events')
 
@@ -607,7 +607,7 @@ function List:num_items()
 end
 
 function List:clear_items()
-  self.items = {}
+  self:set_items({})
 end
 
 function List:set_items(arr)

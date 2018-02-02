@@ -1,5 +1,5 @@
 local ui = require('demos.lib.ui')
-local tb = require('termbox')
+local tb = require('lua-termbox')
 
 -----------------------------------------
 

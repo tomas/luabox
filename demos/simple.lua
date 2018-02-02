@@ -1,4 +1,4 @@
-local tb = require "termbox"
+local tb = require('lua-termbox')
 
 if not tb.init() then
   print('tb_init failed.')

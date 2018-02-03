@@ -1,4 +1,4 @@
-local tb = require('lua-termbox')
+local tb = require('luabox')
 local Object  = require('demos.lib.classic')
 local Emitter = require('demos.lib.events')
 
@@ -90,7 +90,9 @@ function Box:new(opts)
   self.focus_bg = opts.focus_bg
   self.bg_char  = opts.bg_char or ' ' -- or 0x2573 -- 0x26EC -- 0x26F6 -- 0xFFEE -- 0x261B
 
-  self.position = opts.position
+  self.vertical_pos   = opts.vertical_pos   -- top, center or bottom
+  self.horizontal_pos = opts.horizontal_pos -- left, center or right
+
   self.changed  = true
   self.hidden   = opts.hidden or false
   self.parent   = nil
@@ -192,11 +194,27 @@ function Box:margin()
   if w and w < 1 then w = w * parent_w end
   if h and h < 1 then h = h * parent_h end
 
+  local vert_pos = self.vertical_pos
+  local horiz_pos = self.horizontal_pos
+
+  local top, right, bottom, left
+
   -- position "top" is a bit unnecessary, but what the hell.
-  local top    = self.position == "bottom" and (parent_h - h) or (self.top >= 1 and self.top or parent_h * self.top)
-  local bottom = self.position == "top" and (parent_h - h) or (self.bottom >= 1 and self.bottom or parent_h * self.bottom)
-  local left   = self.position == "right" and (parent_w - w) or (self.left >= 1 and self.left or parent_w * self.left)
-  local right  = self.position == "left" and (parent_w - w) or (self.right >= 1 and self.right or parent_w * self.right)
+  if vert_pos == 'center' then
+    top    = (parent_h - h)/2
+    bottom = (parent_h - h)/2
+  else
+    top    = vert_pos == "bottom" and (parent_h - h) or (self.top >= 1 and self.top or parent_h * self.top)
+    bottom = vert_pos == "top" and (parent_h - h) or (self.bottom >= 1 and self.bottom or parent_h * self.bottom)
+  end
+
+  if horiz_pos == 'center' then
+    left   = (parent_w - w)/2
+    right  = (parent_w - w)/2
+  else
+    left   = horiz_pos == "right" and (parent_w - w) or (self.left >= 1 and self.left or parent_w * self.left)
+    right  = horiz_pos == "left" and (parent_w - w) or (self.right >= 1 and self.right or parent_w * self.right)
+  end
 
   return top, right, bottom, left
 end
@@ -328,6 +346,10 @@ function TextBox:set_text(text)
   self.changed = true
   self.text = text -- :gsub("\n", " ")
   self.chars = self.text:len()
+end
+
+function TextBox:get_text()
+  return self.text
 end
 
 function TextBox:render_self()
@@ -562,7 +584,7 @@ function List:new(items, opts)
     elseif key == tb.KEY_HOME then
       self:move_to(1)
     elseif key == tb.KEY_END then
-      if self:num_items() then -- known item count
+      if self:num_items() > 0 then -- known item count
         self:move_to(self:num_items() - h)
       else -- unknown, just forward one page
         self:move(math.floor(h/2))
@@ -600,10 +622,10 @@ end
 
 function List:num_items()
   if not self.items then
-    return nil
+    return -1
   end
 
-  table.getn(self.items)
+  return table.getn(self.items)
 end
 
 function List:clear_items()
@@ -612,6 +634,7 @@ end
 
 function List:set_items(arr)
   self.items = arr
+  self.pos = 1
   self.selected = 0
   self.changed = true
 end
@@ -626,8 +649,20 @@ function List:get_item(number)
   return self.items[number]
 end
 
+function List:get_selected_item()
+  return self:get_item(self.selected)
+end
+
 function List:format_item(item)
   return tostring(item)
+end
+
+function List:item_fg_color(index, item, default_color)
+  return index == self.selected and self.selection_fg or default_color
+end
+
+function List:item_bg_color(index, item, default_color)
+  return index == self.selected and self.selection_bg or default_color
 end
 
 --[[
@@ -667,10 +702,7 @@ function List:render_self()
     end
 
     -- debug({ " --> line " .. index , formatted })
-    tb.string(x, y + line,
-      index == self.selected and self.selection_fg or fg,
-      index == self.selected and self.selection_bg or bg,
-      formatted)
+    tb.string(x, y + line, self:item_fg_color(index, item, fg), self:item_bg_color(index, item, bg), formatted)
   end
 end
 
@@ -716,7 +748,7 @@ function OptionList:select(number)
 end
 
 function OptionList:submit()
-  local item = self:get_item(self.selected)
+  local item = self:get_selected_item()
   if item then
     self:trigger('submit', self.selected, item)
   end
@@ -743,14 +775,6 @@ function Menu:new(items, opts)
   -- self:on('submit', function(index, item)
   --   self:toggle(false)
   -- end)
-end
-
-function Menu:open()
-  self:toggle(true)
-end
-
-function Menu:close()
-  self:toggle(false)
 end
 
 function Menu:set_offset(x, y)
@@ -811,12 +835,12 @@ function load(opts)
     end
     -- self:add(item)
     self.above_item = item
-    item:open()
+    item:toggle(true)
   end
 
   window.hide_above = function(self)
     if self.above_item then
-      self.above_item:close()
+      self.above_item:toggle(false)
       -- self:remove(above_item)
       self.above_item = nil
       self:trigger('resized') -- force redraw of child elements
@@ -861,8 +885,9 @@ function on_click(key, x, y, count)
   if window.above_item then
     if window.above_item:contains(x, y) then
       window.above_item:trigger(event, x, y)
+    else
+      window:hide_above()
     end
-    window:hide_above()
     return -- we don't want to propagate
   end
 
@@ -871,6 +896,7 @@ function on_click(key, x, y, count)
   if event:match('_click') then
     -- trigger a 'click' event for all mouse clicks
     window:trigger('mouse_event', x, y, 'click')
+
     if count > 0 and count % 2 == 0 then -- four clicks in a row should count as 2 x double-click
       window:trigger('mouse_event', x, y, 'double_click')
     elseif count > 0 and count % 3 == 0 then -- same as above, but x3
@@ -907,8 +933,12 @@ function start()
     res = tb.poll_event(ev)
 
     if res == tb.EVENT_KEY then
-      if ev.key == tb.KEY_ESC or ev.key == tb.KEY_CTRL_C then break end
-      on_key(ev.key, ev.ch, ev.meta)
+      if ev.key == tb.KEY_ESC and window.above_item then
+        window:hide_above()
+      else
+        if ev.key == tb.KEY_ESC or ev.key == tb.KEY_CTRL_C then break end
+        on_key(ev.key, ev.ch, ev.meta)
+      end
 
     elseif res == tb.EVENT_MOUSE then
       on_click(ev.key, ev.x, ev.y, ev.clicks)

@@ -1,4 +1,4 @@
-archives="lua-termbox.a termbox/build/libtermbox.a /usr/lib/x86_64-linux-gnu/libluajit-5.1.a"
+archives="luabox.a termbox/build/libtermbox.a /usr/lib/x86_64-linux-gnu/libluajit-5.1.a"
 flags="-lm -no-pie -static"
 includes="-I /usr/include/luajit-2.0/"
 out="ui"

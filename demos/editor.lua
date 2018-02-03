@@ -1,5 +1,5 @@
 local ui = require('demos.lib.ui')
-local tb = require('lua-termbox')
+local tb = require('luabox')
 
 local window, header, footer, editor
 

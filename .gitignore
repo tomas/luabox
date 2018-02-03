@@ -1,3 +1,4 @@
-lua-termbox.o
-lua-termbox.a
-termbox.so
+luabox.a
+luabox.so
+luabox.o
+termbox

@@ -314,7 +314,7 @@ static int l_tb_underline(lua_State *L) {
   return 1;
 }
 
-static const struct luaL_Reg l_termbox[] = {
+static const struct luaL_Reg l_luabox[] = {
   {"init",                   l_tb_init},
   {"init_with",              l_tb_init_with},
   {"shutdown",               l_tb_shutdown},
@@ -357,8 +357,8 @@ static const struct luaL_Reg l_termbox[] = {
   free(name); \
 }
 
-int luaopen_termbox (lua_State *L) {
-  luaL_newlib(L, l_termbox);
+int luaopen_luabox(lua_State *L) {
+  luaL_newlib(L, l_luabox);
 
   REGISTER_CONSTANT(TB_KEY_F1);
   REGISTER_CONSTANT(TB_KEY_F2);

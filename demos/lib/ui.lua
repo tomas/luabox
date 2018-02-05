@@ -817,6 +817,7 @@ end
 function load(opts)
   if not tb.init() then return end
   tb.enable_mouse()
+  tb.hide_cursor()
 
   screen = Container({
     width = tb.width(),

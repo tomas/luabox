@@ -1,5 +1,4 @@
-Termbox library: https://github.com/nsf/termbox
+Luabox
+======
 
-# Usage
-
-Have a look at testit.lua
+An (updated) termbox wrapper for Lua.

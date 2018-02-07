@@ -1,6 +1,7 @@
 local tb = require('luabox')
 local Object  = require('demos.lib.classic')
 local Emitter = require('demos.lib.events')
+local timer = require('demos.lib.timer')
 
 local screen, window, last_click, stopped
 local box_count = 0
@@ -813,8 +814,9 @@ function Menu:size()
 end
 
 -----------------------------------------
+-- load/unload UI
 
-function load(opts)
+local function load(opts)
   if not tb.init() then return end
   tb.enable_mouse()
   tb.hide_cursor()
@@ -852,7 +854,7 @@ function load(opts)
   return window
 end
 
-function unload()
+local function unload()
   if window then
     window:remove()
     window = nil
@@ -860,7 +862,10 @@ function unload()
   end
 end
 
-function on_key(key, char, meta)
+-----------------------------------------
+-- event handling
+
+local function on_key(key, char, meta)
   window:trigger('key', key, char, meta)
   window:trigger('key:' .. key, key, char, meta)
 
@@ -879,7 +884,7 @@ local mouse_events = {
   [tb.KEY_MOUSE_WHEEL_DOWN] = 'scroll_down'
 }
 
-function on_click(key, x, y, count)
+local function on_click(key, x, y, count)
   local event = mouse_events[key]
   if not event then return false end
 
@@ -912,7 +917,7 @@ function on_click(key, x, y, count)
 
 end
 
-function on_resize(w, h)
+local function on_resize(w, h)
   tb.resize()
   screen.width  = w
   screen.height = h
@@ -922,16 +927,49 @@ function on_resize(w, h)
   window:trigger('resized', w, h)
 end
 
-function render()
+-----------------------------------------
+-- timers
+
+local timers = {}
+
+local function add_timer(time, fn)
+  local t = timer.new(function(p)
+    timer.wait(p, time)
+    fn()
+    table.remove(timers, t)
+  end)
+  table.insert(timers, t)
+end
+
+local function update_timers(last_time)
+  local now = timer.now()
+  local delta = now - last_time
+  io.stderr:write("now: " .. now .. ", delta: " .. delta .. "\n")
+  
+  for _, timer in ipairs(timers) do
+    timer:update(delta)
+  end
+  return now
+end
+
+local function clear_timers()
+  timers = {}
+end
+
+-----------------------------------------
+-- loop start/stop/render
+
+local function render()
   window:render()
   tb.render()
 end
 
-function start()
-  local res, ev = nil, {}
+local function start()
+  local res, ev, last_loop = nil, {}, timer.now()
   repeat
     render()
-    res = tb.poll_event(ev)
+    res = tb.peek_event(ev, 100)
+    last_loop = update_timers(last_loop)
 
     if res == tb.EVENT_KEY then
       if ev.key == tb.KEY_ESC and window.above_item then
@@ -948,19 +986,21 @@ function start()
       on_resize(ev.w, ev.h)
     end
   until stopped or res == -1
+  clear_timers()
 end
 
-function stop()
+local function stop()
   stopped = true
 end
 
 local ui  = {}
+ui.tb     = tb -- for constants (eg. tb.BLACK, tb.BOLD)
 ui.load   = load
 ui.unload = unload
 ui.start  = start
 ui.stop   = stop
 ui.render = render
--- ui.bold   = tb.bold
+ui.after  = add_timer -- ui.after(100, do_something())
 
 ui.Box        = Box
 ui.Label      = Label

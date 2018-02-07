@@ -1,7 +1,31 @@
 local tb = require('luabox')
 local Object  = require('demos.lib.classic')
 local Emitter = require('demos.lib.events')
-local timer = require('demos.lib.timer')
+
+-- gettime function, for timers
+
+local ffi = require('ffi')
+local math_floor = math.floor
+
+ffi.cdef [[
+  typedef long time_t;
+  typedef int clockid_t;
+
+  typedef struct tspec {
+      time_t tv_sec;  // secs
+      long   tv_nsec; // nanosecs
+  } nanotime;
+
+  int clock_gettime(clockid_t clk_id, struct tspec *tp);
+]]
+
+local clock = assert(ffi.new('nanotime[?]', 1))
+local gettime = ffi.C.clock_gettime
+
+local function time_now()
+  gettime(1, clock)
+  return tonumber(clock[0].tv_sec * 1000 + math_floor(tonumber(clock[0].tv_nsec/1000000)))
+end
 
 local screen, window, last_click, stopped
 local box_count = 0
@@ -933,22 +957,23 @@ end
 local timers = {}
 
 local function add_timer(time, fn)
-  local t = timer.new(function(p)
-    timer.wait(p, time)
-    fn()
-    table.remove(timers, t)
-  end)
+  local t = { time = time, fn = fn }
   table.insert(timers, t)
 end
 
 local function update_timers(last_time)
-  local now = timer.now()
+  local now = time_now()
   local delta = now - last_time
-  io.stderr:write("now: " .. now .. ", delta: " .. delta .. "\n")
+  -- io.stderr:write("now: " .. now .. ", delta: " .. delta .. "\n")
   
-  for _, timer in ipairs(timers) do
-    timer:update(delta)
+  for idx, timer in ipairs(timers) do
+    timer.time = timer.time - delta
+    if timer.time <= 0 then
+      timer.fn()
+      table.remove(timers, idx)
+    end
   end
+
   return now
 end
 
@@ -965,11 +990,11 @@ local function render()
 end
 
 local function start()
-  local res, ev, last_loop = nil, {}, timer.now()
+  local res, ev, last_loop = nil, {}, time_now()
   repeat
+    last_loop = update_timers(last_loop)
     render()
     res = tb.peek_event(ev, 100)
-    last_loop = update_timers(last_loop)
 
     if res == tb.EVENT_KEY then
       if ev.key == tb.KEY_ESC and window.above_item then

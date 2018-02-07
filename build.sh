@@ -22,8 +22,8 @@ fi
 echo "Cleaning up"
 rm -f $name.o $name.a $name.so $name.os
 
-luainc=$(pkg-config --cflags luajit)
-# luainc="-I/usr/local/crew/include/luajit-2.0/"
+# luainc=$(pkg-config --cflags luajit)
+luainc="-I/usr/local/crew/include/luajit-2.0/"
 
 $CC $CFLAGS $luainc -I termbox/src/ -o $name.o -c -Wall -Werror -fPIC $name.c
 

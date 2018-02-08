@@ -30,7 +30,7 @@ end
 local screen, window, last_click, stopped
 local box_count = 0
 
-function dump(o)
+local function dump(o)
  if type(o) == 'table' then
   local s = '{ '
   for k,v in pairs(o) do
@@ -43,11 +43,11 @@ function dump(o)
  end
 end
 
-function errwrite(str)
+local function errwrite(str)
   io.stderr:write(str .. "\n")
 end
 
-function debug(obj)
+local function debug(obj)
   errwrite(dump(obj))
 end
 

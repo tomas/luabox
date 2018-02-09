@@ -434,9 +434,9 @@ function EditableTextBox:handle_key(key, meta)
     self:delete_char(-1)
   elseif key == tb.KEY_DELETE then
     self:delete_char(0)
-  elseif key == tb.KEY_HOME then
+  elseif key == tb.KEY_HOME or key == tb.KEY_CTRL_A then
     self.cursor_pos = 0
-  elseif key == tb.KEY_END then
+  elseif key == tb.KEY_END or key == tb.KEY_CTRL_E then
     self.cursor_pos = self.text:len()
   elseif key == tb.KEY_ARROW_LEFT then
     self:move_cursor(-1)

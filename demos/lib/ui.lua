@@ -566,6 +566,10 @@ function Label:new(text, opts)
   self.text = text
 end
 
+function Label:get_text(text)
+  return self.text
+end
+
 function Label:set_text(text)
   self.text = text
   self.changed = true
@@ -965,7 +969,7 @@ local function update_timers(last_time)
   local now = time_now()
   local delta = now - last_time
   -- io.stderr:write("now: " .. now .. ", delta: " .. delta .. "\n")
-  
+
   for idx, timer in ipairs(timers) do
     timer.time = timer.time - delta
     if timer.time <= 0 then

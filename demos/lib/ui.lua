@@ -369,7 +369,7 @@ end
 
 function TextBox:set_text(text)
   self.changed = true
-  self.text = text -- :gsub("\n", " ")
+  self.text = text or '' -- :gsub("\n", " ")
   self.chars = self.text:len()
 end
 

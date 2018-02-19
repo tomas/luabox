@@ -966,6 +966,10 @@ local function add_timer(time, fn, repeat)
   return t
 end
 
+local function add_repeating_timer(time, fn)
+  return add_timer(time, fn, true)
+end
+
 local function update_timers(last_time)
   local now = time_now()
   local delta = now - last_time
@@ -1043,6 +1047,7 @@ ui.start  = start
 ui.stop   = stop
 ui.render = render
 ui.after  = add_timer -- ui.after(100, do_something())
+ui.every  = add_repeating_timer
 
 ui.Box        = Box
 ui.Label      = Label

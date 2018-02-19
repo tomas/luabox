@@ -960,8 +960,8 @@ end
 
 local timers = {}
 
-local function add_timer(time, fn, repeat)
-  local t = { time = time, fn = fn, repeat = repeat and time or nil }
+local function add_timer(time, fn, repeating)
+  local t = { time = time, fn = fn, repeating = repeating and time or nil }
   table.insert(timers, t)
   return t
 end
@@ -979,8 +979,8 @@ local function update_timers(last_time)
     timer.time = timer.time - delta
     if timer.time <= 0 then
       timer.fn()
-      if timer.repeat then
-        timer.time = timer.repeat
+      if timer.repeating then
+        timer.time = timer.repeating
       else
         table.remove(timers, idx)
       end

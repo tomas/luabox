@@ -199,6 +199,7 @@ function Box:colors()
   return fg, bg
 end
 
+--[[
 function Box:char(x, y, ch)
   local offset_x, offset_y = self:offset()
   local fg, bg = self:colors()
@@ -210,6 +211,7 @@ function Box:string(x, y, str)
   local fg, bg = self:colors()
   tb.string(offset_x + x, offset_y + y, fg, bg, str)
 end
+--]]
 
 function Box:margin()
   local parent_w, parent_h = self.parent:size()
@@ -642,8 +644,9 @@ function List:move(dir)
 
   -- ensure we stay within bounds
   if result < 1 -- and that the don't show an empty box
-      or dir > 0 and (nitems and result > (nitems - height + dir))
-        then return
+    or dir > 0 and (nitems > 0 and result > (nitems - height + dir)) then
+      -- print(result, nitems, height, dir)
+      return
   end
 
   self:move_to(result)
@@ -758,22 +761,33 @@ function OptionList:new(items, opts)
   end)
 end
 
-function OptionList:move(pos)
-  -- if within screen, just move selection. otherwise, do move
-  if pos == 1 or pos == -1 then
-    self:select(self.selected + pos)
-  else
-    OptionList.super.move(self, pos)
+function OptionList:move(dir)
+  local new_selected = self.selected + dir
+  if new_selected < 1 then
+    new_selected = 1
+  end
+
+  local width, height = self:size()
+  self:select(new_selected)
+
+  -- if new_selected is above position or below position + height, then also move
+  if new_selected <= self.pos or (new_selected >= self.pos + height) then
+    OptionList.super.move(self, dir)
   end
 end
 
 function OptionList:select(number)
   -- check if within bounds and actually changed
-  if (number < 1 or number == self.selected or not self:get_item(number)) then return end
+  local item = self:get_item(number)
+  if (number < 1 or not item) then return end
 
-  self.changed = true
-  self.selected = number
-  self:trigger('selected', number, self:get_item(number))
+  if number ~= self.selected then
+    self.changed = true
+    self.selected = number
+    self:trigger('selected', number, item)
+  end
+
+  return item
 end
 
 function OptionList:submit()

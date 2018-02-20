@@ -134,7 +134,7 @@ function Box:new(opts)
   -- cascade events down
   self:on('mouse_event', function(x, y, evt, ...)
     for _, child in ipairs(self.children) do
-      if child:contains(x, y) then
+      if not child.hidden and child:contains(x, y) then
         child:trigger('mouse_event', x, y, evt, ...)
         child:trigger(evt, x, y, ...)
       end
@@ -869,9 +869,17 @@ local function load(opts)
     item:toggle(true)
   end
 
-  window.hide_above = function(self)
+  window.hide_above = function(self, item)
     if self.above_item then
+      if item and self.above_item ~= item then
+        return -- item was passed, and current above item doesn't match
+      end
+
       self.above_item:toggle(false)
+      if self.focused == self.above_item then
+        self.focused:unfocus()
+      end
+
       -- self:remove(above_item)
       self.above_item = nil
       self:trigger('resized') -- force redraw of child elements

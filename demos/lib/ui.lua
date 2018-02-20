@@ -616,14 +616,16 @@ function List:new(items, opts)
       self:move_to(1)
     elseif key == tb.KEY_END then
       if self:num_items() > 0 then -- known item count
-        self:move_to(self:num_items() - h)
+        self:move_to(self:num_items() - (h-2))
       else -- unknown, just forward one page
-        self:move(math.floor(h/2))
+        self:move(math.floor(h))
       end
     elseif key == tb.KEY_PAGE_DOWN then
       self:move(math.floor(h/2))
+      -- self:move(10)
     elseif key == tb.KEY_PAGE_UP then
       self:move(math.floor(h/2) * -1)
+      -- self:move(-10)
     end
   end)
 
@@ -645,7 +647,6 @@ function List:move(dir)
   -- ensure we stay within bounds
   if result < 1 -- and that the don't show an empty box
     or dir > 0 and (nitems > 0 and result > (nitems - height + dir)) then
-      -- print(result, nitems, height, dir)
       return
   end
 
@@ -762,16 +763,22 @@ function OptionList:new(items, opts)
 end
 
 function OptionList:move(dir)
+  local nitems = self:num_items()
   local new_selected = self.selected + dir
+
   if new_selected < 1 then
     new_selected = 1
+  elseif nitems > 0 and new_selected > nitems then
+    new_selected = nitems
   end
 
   local width, height = self:size()
-  self:select(new_selected)
+  self.selected = new_selected
+  -- FIXME: this is causing segfaults on pagedn/end in log view
+  self:trigger('selected', new_selected, self:get_item(new_selected))
 
   -- if new_selected is above position or below position + height, then also move
-  if new_selected <= self.pos or (new_selected >= self.pos + height) then
+  if new_selected < self.pos or (new_selected >= self.pos + height) then
     OptionList.super.move(self, dir)
   end
 end

@@ -621,10 +621,10 @@ function List:new(items, opts)
         self:move(math.floor(h))
       end
     elseif key == tb.KEY_PAGE_DOWN then
-      self:move(math.floor(h/2))
+      self:move(math.floor(h/3))
       -- self:move(10)
     elseif key == tb.KEY_PAGE_UP then
-      self:move(math.floor(h/2) * -1)
+      self:move(math.floor(h/3) * -1)
       -- self:move(-10)
     end
   end)
@@ -773,13 +773,14 @@ function OptionList:move(dir)
   end
 
   local width, height = self:size()
-  self.selected = new_selected
-  -- FIXME: this is causing segfaults on pagedn/end in log view
-  self:trigger('selected', new_selected, self:get_item(new_selected))
 
   -- if new_selected is above position or below position + height, then also move
   if new_selected < self.pos or (new_selected >= self.pos + height) then
     OptionList.super.move(self, dir)
+  else
+    self.changed = true
+    self.selected = new_selected
+    self:trigger('selected', new_selected, self:get_item(new_selected))
   end
 end
 
@@ -941,9 +942,13 @@ local mouse_events = {
   [tb.KEY_MOUSE_WHEEL_DOWN] = 'scroll_down'
 }
 
-local function on_click(key, x, y, count)
+local function on_click(key, x, y, count, is_motion)
   local event = mouse_events[key]
   if not event then return false end
+
+  if is_motion then
+    return
+  end
 
   if window.above_item then
     if window.above_item:contains(x, y) then
@@ -954,7 +959,7 @@ local function on_click(key, x, y, count)
     return -- we don't want to propagate
   end
 
-  window:trigger('mouse_event', x, y, event)
+  window:trigger('mouse_event', x, y, event, is_motion)
 
   if event:match('_click') then
     -- trigger a 'click' event for all mouse clicks
@@ -1055,7 +1060,7 @@ local function start()
       end
 
     elseif res == tb.EVENT_MOUSE then
-      on_click(ev.key, ev.x, ev.y, ev.clicks)
+      on_click(ev.key, ev.x, ev.y, ev.clicks, ev.meta == 10)
 
     elseif res == tb.EVENT_RESIZE then
       on_resize(ev.w, ev.h)

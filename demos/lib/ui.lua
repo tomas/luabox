@@ -171,17 +171,32 @@ function Box:focus()
   if self:is_focused() then return end
 
   -- unfocus whatever box is marked as focused
-  if window.focused then
-    window.focused:unfocus()
-  end
+  -- store previously focused element
+  local prev_focused = window.focused
 
-  self:trigger('focused')
+  -- set current focused element to this
   window.focused = self
+
+  -- trigger unfocused for previously focused
+  if prev_focused then prev_focused:unfocus() end
+
+  -- and trigger 'focused' for newly focused, passsing prev focused as param
+  self:trigger('focused', prev_focused)
   self.changed = true
 end
 
 function Box:is_focused()
   return window.focused == self
+end
+
+function Box:set_bg(color)
+  self.bg = color
+  self.changed = true
+end
+
+function Box:set_fg(color)
+  self.fg = color
+  self.changed = true
 end
 
 function Box:colors()
@@ -351,6 +366,9 @@ function Box:remove_tree()
 end
 
 function Box:remove()
+  if self.parent and self.parent.trigger then
+    self.parent:trigger('child_removed', self)
+  end
   self:remove_tree()
   self.emitter:removeAllListeners()
   self.hidden = true
@@ -916,6 +934,7 @@ local function unload()
   if window then
     window:remove()
     window = nil
+    -- tb.show_cursor()
     tb.shutdown()
   end
 end
@@ -1055,7 +1074,7 @@ local function start()
       if ev.key == tb.KEY_ESC and window.above_item then
         window:hide_above()
       else
-        if ev.key == tb.KEY_ESC or ev.key == tb.KEY_CTRL_C then break end
+        if ev.key == tb.KEY_ESC or ev.key == tb.KEY_CTRL_C or ev.key == tb.KEY_CTRL_Q then break end
         on_key(ev.key, ev.ch, ev.meta)
       end
 

@@ -346,160 +346,151 @@ static const struct luaL_Reg l_luabox[] = {
   {NULL,NULL}
 };
 
-/* remove TB_ prefix and register constant */
-#define REGISTER_CONSTANT(constant) {\
-  char* full_name = #constant; \
-  unsigned len = strlen(full_name)+1; \
-  char* name = (char*)malloc(len-3); \
-  strncpy(name, full_name+3, len-3); \
-  lua_pushnumber(L, constant); \
-  lua_setfield(L, -2, name); \
-  free(name); \
-}
-
 int luaopen_luabox(lua_State *L) {
   luaL_newlib(L, l_luabox);
 
-  REGISTER_CONSTANT(TB_KEY_F1);
-  REGISTER_CONSTANT(TB_KEY_F2);
-  REGISTER_CONSTANT(TB_KEY_F3);
-  REGISTER_CONSTANT(TB_KEY_F4);
-  REGISTER_CONSTANT(TB_KEY_F5);
-  REGISTER_CONSTANT(TB_KEY_F6);
-  REGISTER_CONSTANT(TB_KEY_F7);
-  REGISTER_CONSTANT(TB_KEY_F8);
-  REGISTER_CONSTANT(TB_KEY_F9);
-  REGISTER_CONSTANT(TB_KEY_F10);
-  REGISTER_CONSTANT(TB_KEY_F11);
-  REGISTER_CONSTANT(TB_KEY_F12);
-  REGISTER_CONSTANT(TB_KEY_INSERT);
-  REGISTER_CONSTANT(TB_KEY_DELETE);
-  REGISTER_CONSTANT(TB_KEY_HOME);
-  REGISTER_CONSTANT(TB_KEY_END);
-  REGISTER_CONSTANT(TB_KEY_PGUP);
-  REGISTER_CONSTANT(TB_KEY_PGDN);
-  REGISTER_CONSTANT(TB_KEY_PAGE_UP);
-  REGISTER_CONSTANT(TB_KEY_PAGE_DOWN);
+  // init options
+  lua_pushnumber(L, TB_INIT_ALL          ); lua_setfield(L, -2, "INIT_ALL");
+  lua_pushnumber(L, TB_INIT_ALTSCREEN    ); lua_setfield(L, -2, "INIT_ALTSCREEN");
+  lua_pushnumber(L, TB_INIT_KEYPAD       ); lua_setfield(L, -2, "INIT_KEYPAD");
+  lua_pushnumber(L, TB_INIT_NO_CURSOR    ); lua_setfield(L, -2, "INIT_NO_CURSOR");
+  lua_pushnumber(L, TB_INIT_DETECT_MODE  ); lua_setfield(L, -2, "INIT_DETECT_MODE");
 
-  REGISTER_CONSTANT(TB_KEY_ARROW_UP);
-  REGISTER_CONSTANT(TB_KEY_ARROW_DOWN);
-  REGISTER_CONSTANT(TB_KEY_ARROW_LEFT);
-  REGISTER_CONSTANT(TB_KEY_ARROW_RIGHT);
+  // output modes
+  lua_pushnumber(L, TB_OUTPUT_NORMAL); lua_setfield(L, -2, "OUTPUT_NORMAL");
+  lua_pushnumber(L, TB_OUTPUT_256);    lua_setfield(L, -2, "OUTPUT_256");
+  #ifdef WITH_TRUECOLOR
+  lua_pushnumber(L, TB_OUTPUT_TRUECOLOR); lua_setfield(L, -2, "OUTPUT_TRUECOLOR");
+  #endif
 
-  REGISTER_CONSTANT(TB_KEY_MOUSE_LEFT);
-  REGISTER_CONSTANT(TB_KEY_MOUSE_RIGHT);
-  REGISTER_CONSTANT(TB_KEY_MOUSE_MIDDLE);
-  REGISTER_CONSTANT(TB_KEY_MOUSE_RELEASE);
-  REGISTER_CONSTANT(TB_KEY_MOUSE_WHEEL_UP);
-  REGISTER_CONSTANT(TB_KEY_MOUSE_WHEEL_DOWN);
+  // errors
+  lua_pushnumber(L, TB_EUNSUPPORTED_TERMINAL); lua_setfield(L, -2, "EUNSUPPORTED_TERMINAL");
+  lua_pushnumber(L, TB_EFAILED_TO_OPEN_TTY  ); lua_setfield(L, -2, "EFAILED_TO_OPEN_TTY");
+  lua_pushnumber(L, TB_EPIPE_TRAP_ERROR     ); lua_setfield(L, -2, "EPIPE_TRAP_ERROR");
 
-  REGISTER_CONSTANT(TB_KEY_CTRL_TILDE);
-  REGISTER_CONSTANT(TB_KEY_CTRL_2);
-  REGISTER_CONSTANT(TB_KEY_CTRL_A);
-  REGISTER_CONSTANT(TB_KEY_CTRL_B);
-  REGISTER_CONSTANT(TB_KEY_CTRL_C);
-  REGISTER_CONSTANT(TB_KEY_CTRL_D);
-  REGISTER_CONSTANT(TB_KEY_CTRL_E);
-  REGISTER_CONSTANT(TB_KEY_CTRL_F);
-  REGISTER_CONSTANT(TB_KEY_CTRL_G);
-  REGISTER_CONSTANT(TB_KEY_BACKSPACE);
-  REGISTER_CONSTANT(TB_KEY_CTRL_H);
-  REGISTER_CONSTANT(TB_KEY_TAB);
-  REGISTER_CONSTANT(TB_KEY_CTRL_I);
-  REGISTER_CONSTANT(TB_KEY_CTRL_J);
-  REGISTER_CONSTANT(TB_KEY_CTRL_K);
-  REGISTER_CONSTANT(TB_KEY_CTRL_L);
-  REGISTER_CONSTANT(TB_KEY_ENTER);
-  REGISTER_CONSTANT(TB_KEY_CTRL_M);
-  REGISTER_CONSTANT(TB_KEY_CTRL_N);
-  REGISTER_CONSTANT(TB_KEY_CTRL_O);
-  REGISTER_CONSTANT(TB_KEY_CTRL_P);
-  REGISTER_CONSTANT(TB_KEY_CTRL_Q);
-  REGISTER_CONSTANT(TB_KEY_CTRL_R);
-  REGISTER_CONSTANT(TB_KEY_CTRL_S);
-  REGISTER_CONSTANT(TB_KEY_CTRL_T);
-  REGISTER_CONSTANT(TB_KEY_CTRL_U);
-  REGISTER_CONSTANT(TB_KEY_CTRL_V);
-  REGISTER_CONSTANT(TB_KEY_CTRL_W);
-  REGISTER_CONSTANT(TB_KEY_CTRL_X);
-  REGISTER_CONSTANT(TB_KEY_CTRL_Y);
-  REGISTER_CONSTANT(TB_KEY_CTRL_Z);
-  REGISTER_CONSTANT(TB_KEY_ESC);
-  REGISTER_CONSTANT(TB_KEY_CTRL_LSQ_BRACKET);
-  REGISTER_CONSTANT(TB_KEY_CTRL_3);
-  REGISTER_CONSTANT(TB_KEY_CTRL_4);
-  REGISTER_CONSTANT(TB_KEY_CTRL_BACKSLASH);
-  REGISTER_CONSTANT(TB_KEY_CTRL_5);
-  REGISTER_CONSTANT(TB_KEY_CTRL_RSQ_BRACKET);
-  REGISTER_CONSTANT(TB_KEY_CTRL_6);
-  REGISTER_CONSTANT(TB_KEY_CTRL_7);
-  REGISTER_CONSTANT(TB_KEY_CTRL_SLASH);
-  REGISTER_CONSTANT(TB_KEY_CTRL_UNDERSCORE);
-  REGISTER_CONSTANT(TB_KEY_SPACE);
-  REGISTER_CONSTANT(TB_KEY_BACKSPACE2);
-  REGISTER_CONSTANT(TB_KEY_CTRL_8);
+  // event types
+  lua_pushnumber(L, TB_EVENT_KEY    ); lua_setfield(L, -2, "EVENT_KEY");
+  lua_pushnumber(L, TB_EVENT_RESIZE ); lua_setfield(L, -2, "EVENT_RESIZE");
+  lua_pushnumber(L, TB_EVENT_MOUSE  ); lua_setfield(L, -2, "EVENT_MOUSE");
 
-  REGISTER_CONSTANT(TB_META_MOTION); // for mouse events
-  REGISTER_CONSTANT(TB_META_SHIFT);
-  REGISTER_CONSTANT(TB_META_ALT);
-  REGISTER_CONSTANT(TB_META_ALTSHIFT);
-  REGISTER_CONSTANT(TB_META_CTRL);
-  REGISTER_CONSTANT(TB_META_CTRLSHIFT);
-  REGISTER_CONSTANT(TB_META_ALTCTRL);
-  REGISTER_CONSTANT(TB_META_ALTCTRLSHIFT);
+  // text attributes
+  lua_pushnumber(L, TB_BOLD         ); lua_setfield(L, -2, "BOLD");
+  lua_pushnumber(L, TB_UNDERLINE    ); lua_setfield(L, -2, "UNDERLINE");
+  lua_pushnumber(L, TB_REVERSE      ); lua_setfield(L, -2, "REVERSE");
 
-  REGISTER_CONSTANT(TB_DEFAULT);
-  REGISTER_CONSTANT(TB_BLACK);
-  REGISTER_CONSTANT(TB_RED);
-  REGISTER_CONSTANT(TB_GREEN);
-  REGISTER_CONSTANT(TB_YELLOW);
-  REGISTER_CONSTANT(TB_BLUE);
-  REGISTER_CONSTANT(TB_MAGENTA);
-  REGISTER_CONSTANT(TB_CYAN);
-  REGISTER_CONSTANT(TB_WHITE);
+  // colors
+  lua_pushnumber(L, TB_DEFAULT       ); lua_setfield(L, -2, "DEFAULT");
+  lua_pushnumber(L, TB_RED           ); lua_setfield(L, -2, "RED");
+  lua_pushnumber(L, TB_GREEN         ); lua_setfield(L, -2, "GREEN");
+  lua_pushnumber(L, TB_YELLOW        ); lua_setfield(L, -2, "YELLOW");
+  lua_pushnumber(L, TB_BLUE          ); lua_setfield(L, -2, "BLUE");
+  lua_pushnumber(L, TB_MAGENTA       ); lua_setfield(L, -2, "MAGENTA");
+  lua_pushnumber(L, TB_CYAN          ); lua_setfield(L, -2, "CYAN");
+  lua_pushnumber(L, TB_LIGHT_GRAY    ); lua_setfield(L, -2, "LIGHT_GRAY");
+  lua_pushnumber(L, TB_MEDIUM_GRAY   ); lua_setfield(L, -2, "MEDIUM_GRAY");
+  lua_pushnumber(L, TB_LIGHT_RED     ); lua_setfield(L, -2, "LIGHT_RED");
+  lua_pushnumber(L, TB_LIGHT_GREEN   ); lua_setfield(L, -2, "LIGHT_GREEN");
+  lua_pushnumber(L, TB_LIGHT_YELLOW  ); lua_setfield(L, -2, "LIGHT_YELLOW");
+  lua_pushnumber(L, TB_LIGHT_BLUE    ); lua_setfield(L, -2, "LIGHT_BLUE");
+  lua_pushnumber(L, TB_LIGHT_MAGENTA ); lua_setfield(L, -2, "LIGHT_MAGENTA");
+  lua_pushnumber(L, TB_LIGHT_CYAN    ); lua_setfield(L, -2, "LIGHT_CYAN");
+  lua_pushnumber(L, TB_WHITE         ); lua_setfield(L, -2, "WHITE");
+  lua_pushnumber(L, TB_BLACK         ); lua_setfield(L, -2, "BLACK");
 
-  REGISTER_CONSTANT(TB_LIGHT_GRAY);
-  REGISTER_CONSTANT(TB_MEDIUM_GRAY);
-  REGISTER_CONSTANT(TB_LIGHT_RED);
-  REGISTER_CONSTANT(TB_LIGHT_GREEN);
-  REGISTER_CONSTANT(TB_LIGHT_YELLOW);
-  REGISTER_CONSTANT(TB_LIGHT_BLUE);
-  REGISTER_CONSTANT(TB_LIGHT_MAGENTA);
-  REGISTER_CONSTANT(TB_LIGHT_CYAN);
-  REGISTER_CONSTANT(TB_WHITE);
+  lua_pushnumber(L, TB_DARKEST_GRAY   ); lua_setfield(L, -2, "DARKEST_GRAY");
+  lua_pushnumber(L, TB_DARKER_GRAY    ); lua_setfield(L, -2, "DARKER_GRAY");
+  lua_pushnumber(L, TB_DARK_GRAY      ); lua_setfield(L, -2, "DARK_GRAY");
+  lua_pushnumber(L, TB_LIGHTER_GRAY   ); lua_setfield(L, -2, "LIGHTER_GRAY");
+  lua_pushnumber(L, TB_LIGHTEST_GRAY  ); lua_setfield(L, -2, "LIGHTEST_GRAY");
 
-  REGISTER_CONSTANT(TB_DARKEST_GREY);
-  REGISTER_CONSTANT(TB_DARKER_GREY);
-  REGISTER_CONSTANT(TB_DARK_GREY);
-  REGISTER_CONSTANT(TB_MEDIUM_GREY);
-  REGISTER_CONSTANT(TB_LIGHT_GREY);
-  REGISTER_CONSTANT(TB_LIGHTER_GREY);
-  REGISTER_CONSTANT(TB_LIGHTEST_GREY);
+  lua_pushnumber(L, TB_NONE           ); lua_setfield(L, -2, "NONE");
+  lua_pushnumber(L, TB_DARKEST_GREY   ); lua_setfield(L, -2, "DARKEST_GREY");
+  lua_pushnumber(L, TB_DARKER_GREY    ); lua_setfield(L, -2, "DARKER_GREY");
+  lua_pushnumber(L, TB_DARK_GREY      ); lua_setfield(L, -2, "DARK_GREY");
+  lua_pushnumber(L, TB_MEDIUM_GREY    ); lua_setfield(L, -2, "MEDIUM_GREY");
+  lua_pushnumber(L, TB_LIGHT_GREY     ); lua_setfield(L, -2, "LIGHT_GREY");
+  lua_pushnumber(L, TB_LIGHTER_GREY   ); lua_setfield(L, -2, "LIGHTER_GREY");
+  lua_pushnumber(L, TB_LIGHTEST_GREY  ); lua_setfield(L, -2, "LIGHTEST_GREY");
 
-  REGISTER_CONSTANT(TB_BOLD);
-  REGISTER_CONSTANT(TB_UNDERLINE);
-  REGISTER_CONSTANT(TB_REVERSE);
+  // keys
+  lua_pushnumber(L, TB_KEY_F1               ); lua_setfield(L, -2, "KEY_F1");
+  lua_pushnumber(L, TB_KEY_F2               ); lua_setfield(L, -2, "KEY_F2");
+  lua_pushnumber(L, TB_KEY_F3               ); lua_setfield(L, -2, "KEY_F3");
+  lua_pushnumber(L, TB_KEY_F4               ); lua_setfield(L, -2, "KEY_F4");
+  lua_pushnumber(L, TB_KEY_F5               ); lua_setfield(L, -2, "KEY_F5");
+  lua_pushnumber(L, TB_KEY_F6               ); lua_setfield(L, -2, "KEY_F6");
+  lua_pushnumber(L, TB_KEY_F7               ); lua_setfield(L, -2, "KEY_F7");
+  lua_pushnumber(L, TB_KEY_F8               ); lua_setfield(L, -2, "KEY_F8");
+  lua_pushnumber(L, TB_KEY_F9               ); lua_setfield(L, -2, "KEY_F9");
+  lua_pushnumber(L, TB_KEY_F10              ); lua_setfield(L, -2, "KEY_F10");
+  lua_pushnumber(L, TB_KEY_F11              ); lua_setfield(L, -2, "KEY_F11");
+  lua_pushnumber(L, TB_KEY_F12              ); lua_setfield(L, -2, "KEY_F12");
+  lua_pushnumber(L, TB_KEY_INSERT           ); lua_setfield(L, -2, "KEY_INSERT");
+  lua_pushnumber(L, TB_KEY_DELETE           ); lua_setfield(L, -2, "KEY_DELETE");
+  lua_pushnumber(L, TB_KEY_HOME             ); lua_setfield(L, -2, "KEY_HOME");
+  lua_pushnumber(L, TB_KEY_END              ); lua_setfield(L, -2, "KEY_END");
+  lua_pushnumber(L, TB_KEY_PGUP             ); lua_setfield(L, -2, "KEY_PGUP");
+  lua_pushnumber(L, TB_KEY_PGDN             ); lua_setfield(L, -2, "KEY_PGDN");
+  lua_pushnumber(L, TB_KEY_PAGE_UP          ); lua_setfield(L, -2, "KEY_PAGE_UP");
+  lua_pushnumber(L, TB_KEY_PAGE_DOWN        ); lua_setfield(L, -2, "KEY_PAGE_DOWN");
 
-  REGISTER_CONSTANT(TB_EVENT_KEY);
-  REGISTER_CONSTANT(TB_EVENT_RESIZE);
-  REGISTER_CONSTANT(TB_EVENT_MOUSE);
+  lua_pushnumber(L, TB_KEY_ARROW_LEFT       ); lua_setfield(L, -2, "KEY_ARROW_LEFT");
+  lua_pushnumber(L, TB_KEY_ARROW_RIGHT      ); lua_setfield(L, -2, "KEY_ARROW_RIGHT");
+  lua_pushnumber(L, TB_KEY_ARROW_DOWN       ); lua_setfield(L, -2, "KEY_ARROW_DOWN");
+  lua_pushnumber(L, TB_KEY_ARROW_UP         ); lua_setfield(L, -2, "KEY_ARROW_UP");
 
-  REGISTER_CONSTANT(TB_INIT_ALL);
-  REGISTER_CONSTANT(TB_INIT_ALTSCREEN);
-  REGISTER_CONSTANT(TB_INIT_KEYPAD);
-  REGISTER_CONSTANT(TB_INIT_NO_CURSOR);
-  REGISTER_CONSTANT(TB_INIT_DETECT_MODE);
+  lua_pushnumber(L, TB_KEY_MOUSE_LEFT       ); lua_setfield(L, -2, "KEY_MOUSE_LEFT");
+  lua_pushnumber(L, TB_KEY_MOUSE_RIGHT      ); lua_setfield(L, -2, "KEY_MOUSE_RIGHT");
+  lua_pushnumber(L, TB_KEY_MOUSE_MIDDLE     ); lua_setfield(L, -2, "KEY_MOUSE_MIDDLE");
+  lua_pushnumber(L, TB_KEY_MOUSE_RELEASE    ); lua_setfield(L, -2, "KEY_MOUSE_RELEASE");
+  lua_pushnumber(L, TB_KEY_MOUSE_WHEEL_UP   ); lua_setfield(L, -2, "KEY_MOUSE_WHEEL_UP");
+  lua_pushnumber(L, TB_KEY_MOUSE_WHEEL_DOWN ); lua_setfield(L, -2, "KEY_MOUSE_WHEEL_DOWN");
 
-  REGISTER_CONSTANT(TB_EUNSUPPORTED_TERMINAL);
-  REGISTER_CONSTANT(TB_EFAILED_TO_OPEN_TTY);
-  REGISTER_CONSTANT(TB_EPIPE_TRAP_ERROR);
+  lua_pushnumber(L, TB_KEY_CTRL_TILDE       ); lua_setfield(L, -2, "KEY_CTRL_TILDE");
+  lua_pushnumber(L, TB_KEY_CTRL_2           ); lua_setfield(L, -2, "KEY_CTRL_2");
+  lua_pushnumber(L, TB_KEY_CTRL_A           ); lua_setfield(L, -2, "KEY_CTRL_A");
+  lua_pushnumber(L, TB_KEY_CTRL_B           ); lua_setfield(L, -2, "KEY_CTRL_B");
+  lua_pushnumber(L, TB_KEY_CTRL_C           ); lua_setfield(L, -2, "KEY_CTRL_C");
+  lua_pushnumber(L, TB_KEY_CTRL_D           ); lua_setfield(L, -2, "KEY_CTRL_D");
+  lua_pushnumber(L, TB_KEY_CTRL_E           ); lua_setfield(L, -2, "KEY_CTRL_E");
+  lua_pushnumber(L, TB_KEY_CTRL_F           ); lua_setfield(L, -2, "KEY_CTRL_F");
+  lua_pushnumber(L, TB_KEY_CTRL_G           ); lua_setfield(L, -2, "KEY_CTRL_G");
+  lua_pushnumber(L, TB_KEY_BACKSPACE        ); lua_setfield(L, -2, "KEY_BACKSPACE");
+  lua_pushnumber(L, TB_KEY_CTRL_H           ); lua_setfield(L, -2, "KEY_CTRL_H");
+  lua_pushnumber(L, TB_KEY_TAB              ); lua_setfield(L, -2, "KEY_TAB");
+  lua_pushnumber(L, TB_KEY_CTRL_I           ); lua_setfield(L, -2, "KEY_CTRL_I");
+  lua_pushnumber(L, TB_KEY_CTRL_J           ); lua_setfield(L, -2, "KEY_CTRL_J");
+  lua_pushnumber(L, TB_KEY_CTRL_K           ); lua_setfield(L, -2, "KEY_CTRL_K");
+  lua_pushnumber(L, TB_KEY_CTRL_L           ); lua_setfield(L, -2, "KEY_CTRL_L");
+  lua_pushnumber(L, TB_KEY_ENTER            ); lua_setfield(L, -2, "KEY_ENTER");
+  lua_pushnumber(L, TB_KEY_CTRL_M           ); lua_setfield(L, -2, "KEY_CTRL_M");
+  lua_pushnumber(L, TB_KEY_CTRL_N           ); lua_setfield(L, -2, "KEY_CTRL_N");
+  lua_pushnumber(L, TB_KEY_CTRL_O           ); lua_setfield(L, -2, "KEY_CTRL_O");
+  lua_pushnumber(L, TB_KEY_CTRL_P           ); lua_setfield(L, -2, "KEY_CTRL_P");
+  lua_pushnumber(L, TB_KEY_CTRL_Q           ); lua_setfield(L, -2, "KEY_CTRL_Q");
+  lua_pushnumber(L, TB_KEY_CTRL_R           ); lua_setfield(L, -2, "KEY_CTRL_R");
+  lua_pushnumber(L, TB_KEY_CTRL_S           ); lua_setfield(L, -2, "KEY_CTRL_S");
+  lua_pushnumber(L, TB_KEY_CTRL_T           ); lua_setfield(L, -2, "KEY_CTRL_T");
+  lua_pushnumber(L, TB_KEY_CTRL_U           ); lua_setfield(L, -2, "KEY_CTRL_U");
+  lua_pushnumber(L, TB_KEY_CTRL_V           ); lua_setfield(L, -2, "KEY_CTRL_V");
+  lua_pushnumber(L, TB_KEY_CTRL_W           ); lua_setfield(L, -2, "KEY_CTRL_W");
+  lua_pushnumber(L, TB_KEY_CTRL_X           ); lua_setfield(L, -2, "KEY_CTRL_X");
+  lua_pushnumber(L, TB_KEY_CTRL_Y           ); lua_setfield(L, -2, "KEY_CTRL_Y");
+  lua_pushnumber(L, TB_KEY_CTRL_Z           ); lua_setfield(L, -2, "KEY_CTRL_Z");
+  lua_pushnumber(L, TB_KEY_ESC              ); lua_setfield(L, -2, "KEY_ESC");
+  lua_pushnumber(L, TB_KEY_CTRL_LSQ_BRACKET ); lua_setfield(L, -2, "KEY_CTRL_LSQ_BRACKET");
+  lua_pushnumber(L, TB_KEY_CTRL_3           ); lua_setfield(L, -2, "KEY_CTRL_3");
+  lua_pushnumber(L, TB_KEY_CTRL_4           ); lua_setfield(L, -2, "KEY_CTRL_4");
+  lua_pushnumber(L, TB_KEY_CTRL_BACKSLASH   ); lua_setfield(L, -2, "KEY_CTRL_BACKSLASH");
+  lua_pushnumber(L, TB_KEY_CTRL_5           ); lua_setfield(L, -2, "KEY_CTRL_5");
+  lua_pushnumber(L, TB_KEY_CTRL_RSQ_BRACKET ); lua_setfield(L, -2, "KEY_CTRL_RSQ_BRACKET");
+  lua_pushnumber(L, TB_KEY_CTRL_6           ); lua_setfield(L, -2, "KEY_CTRL_6");
+  lua_pushnumber(L, TB_KEY_CTRL_7           ); lua_setfield(L, -2, "KEY_CTRL_7");
+  lua_pushnumber(L, TB_KEY_CTRL_SLASH       ); lua_setfield(L, -2, "KEY_CTRL_SLASH");
+  lua_pushnumber(L, TB_KEY_CTRL_UNDERSCORE  ); lua_setfield(L, -2, "KEY_CTRL_UNDERSCORE");
+  lua_pushnumber(L, TB_KEY_SPACE            ); lua_setfield(L, -2, "KEY_SPACE");
+  lua_pushnumber(L, TB_KEY_BACKSPACE2       ); lua_setfield(L, -2, "KEY_BACKSPACE2");
+  lua_pushnumber(L, TB_KEY_CTRL_8           ); lua_setfield(L, -2, "KEY_CTRL_8");
 
-  REGISTER_CONSTANT(TB_OUTPUT_NORMAL);
-  REGISTER_CONSTANT(TB_OUTPUT_256);
-#ifdef WITH_TRUECOLOR
-  REGISTER_CONSTANT(TB_OUTPUT_TRUECOLOR);
-#endif
-
-  REGISTER_CONSTANT(TB_EOF);
   return 1;
 }

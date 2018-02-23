@@ -27,7 +27,7 @@ local function time_now()
   return tonumber(clock[0].tv_sec * 1000 + math_floor(tonumber(clock[0].tv_nsec/1000000)))
 end
 
-local screen, window, last_click, stopped
+local screen, window, stopped
 local box_count = 0
 
 local function dump(o)
@@ -302,7 +302,7 @@ end
 
 function Box:add(child)
   if child.parent then
-    print("Child already has a parent!")
+    errwrite("Child already has a parent!")
     return
   end
 
@@ -352,6 +352,7 @@ function Box:contains(x, y)
 end
 
 function Box:render()
+  -- errwrite('rendering ' .. self.id)
   if not self.hidden then
     if self.changed then self:render_self() end
     self:render_tree()
@@ -965,9 +966,7 @@ local function on_click(key, x, y, count, is_motion)
   local event = mouse_events[key]
   if not event then return false end
 
-  if is_motion then
-    return
-  end
+  if is_motion then return end
 
   if window.above_item then
     if window.above_item:contains(x, y) then
@@ -1079,7 +1078,7 @@ local function start()
       end
 
     elseif res == tb.EVENT_MOUSE then
-      on_click(ev.key, ev.x, ev.y, ev.clicks, ev.meta == 10)
+      on_click(ev.key, ev.x, ev.y, ev.clicks, ev.meta == 9)
 
     elseif res == tb.EVENT_RESIZE then
       on_resize(ev.w, ev.h)

@@ -2,3 +2,4 @@ luabox.a
 luabox.so
 luabox.o
 termbox
+layout

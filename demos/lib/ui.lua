@@ -451,6 +451,8 @@ end
 function EditableTextBox:handle_key(key, meta)
   if key == tb.KEY_ENTER then
     self:append_char('\n')
+  elseif key == tb.KEY_BACKSPACE and meta == tb.META_ALT then
+    self:delete_last_word()
   elseif key == tb.KEY_BACKSPACE2 then
     self:delete_char(-1)
   elseif key == tb.KEY_DELETE then
@@ -500,7 +502,7 @@ end
 
 function EditableTextBox:delete_char(at)
   if (self.cursor_pos == 0 and at < 0) or (self.cursor_pos == self.chars and at >= 0) then
-    return
+    return false
   end
 
   if self.cursor_pos == self.chars then
@@ -511,6 +513,16 @@ function EditableTextBox:delete_char(at)
 
   self.chars = self.chars - 1
   self.cursor_pos = self.cursor_pos + at
+  return true
+end
+
+function EditableTextBox:delete_last_word()
+  local deleting = true
+  while deleting do
+    if self:delete_char(-1) == false or self:get_char_at_pos(self.cursor_pos) == " " then
+      deleting = false
+    end
+  end
 end
 
 function EditableTextBox:get_cursor_offset(width)
@@ -560,13 +572,17 @@ function EditableTextBox:get_cursor_offset(width)
   return x, y
 end
 
+function EditableTextBox:get_char_at_pos(pos)
+  return self.text:sub(pos, pos)
+end
+
 function EditableTextBox:render_cursor()
   local x, y = self:offset()
   local fg, bg = self:colors()
   local width, height = self:size()
 
   local cursor_x, cursor_y = self:get_cursor_offset(math.floor(width))
-  local char = self.text:sub(self.cursor_pos+1, self.cursor_pos+1)
+  local char = self:get_char_at_pos(self.cursor_pos+1)
   tb.string(x + cursor_x, y + cursor_y, fg, tb.RED, (char == '' or char == '\n') and ' ' or char)
 end
 

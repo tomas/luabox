@@ -6,6 +6,7 @@
 #include "util.h"
 
 #if defined(LUA_VERSION_NUM) && LUA_VERSION_NUM == 501
+/*
   LUALIB_API void luaL_setfuncs(lua_State *L, const luaL_Reg *l, int nup) {
     // luaL_checkversion(L);
     luaL_checkstack(L, nup, "too many upvalues");
@@ -21,8 +22,10 @@
 
   #define luaL_newlibtable(L,l)       lua_createtable(L, 0, sizeof(l)/sizeof((l)[0]) - 1)
   #define luaL_newlib(L,l)            (luaL_newlibtable(L,l), luaL_setfuncs(L,l,0))
+*/
   #define luaL_checkunsigned(L, narg) (luaL_checknumber(L, narg))
   #define luaL_len(L, idx)            (lua_objlen(L, idx))
+
 #elif defined(LUA_VERSION_NUM) && LUA_VERSION_NUM == 503
   #define luaL_checkunsigned(L, narg) (luaL_checknumber(L, narg))
 #endif
@@ -491,6 +494,15 @@ int luaopen_luabox(lua_State *L) {
   lua_pushnumber(L, TB_KEY_SPACE            ); lua_setfield(L, -2, "KEY_SPACE");
   lua_pushnumber(L, TB_KEY_BACKSPACE2       ); lua_setfield(L, -2, "KEY_BACKSPACE2");
   lua_pushnumber(L, TB_KEY_CTRL_8           ); lua_setfield(L, -2, "KEY_CTRL_8");
+
+  lua_pushnumber(L, TB_META_SHIFT           ); lua_setfield(L, -2, "META_SHIFT");
+  lua_pushnumber(L, TB_META_ALT             ); lua_setfield(L, -2, "META_ALT");
+  lua_pushnumber(L, TB_META_ALTSHIFT        ); lua_setfield(L, -2, "META_ALTSHIFT");
+  lua_pushnumber(L, TB_META_CTRL            ); lua_setfield(L, -2, "META_CTRL");
+  lua_pushnumber(L, TB_META_CTRLSHIFT       ); lua_setfield(L, -2, "META_CTRLSHIFT");
+  lua_pushnumber(L, TB_META_ALTCTRL         ); lua_setfield(L, -2, "META_ALTCTRL");
+  lua_pushnumber(L, TB_META_ALTCTRLSHIFT    ); lua_setfield(L, -2, "META_ALTCTRLSHIFT");
+  lua_pushnumber(L, TB_META_MOTION          ); lua_setfield(L, -2, "META_MOTION");
 
   return 1;
 }

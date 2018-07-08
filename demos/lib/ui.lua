@@ -648,18 +648,19 @@ function List:new(items, opts)
     elseif key == tb.KEY_ARROW_UP then
       self:move(-1)
     elseif key == tb.KEY_HOME then
-      self:move_to(1)
+      self:move_to(1, true)
     elseif key == tb.KEY_END then
       if self:num_items() > 0 then -- known item count
         self:move_to(self:num_items() - (h-2))
+        self:set_selected_item(self:num_items(), true)
       else -- unknown, just forward one page
         self:move(math.floor(h))
       end
     elseif key == tb.KEY_PAGE_DOWN then
-      self:move(math.floor(h/3))
+      self:move(math.floor(h/2))
       -- self:move(10)
     elseif key == tb.KEY_PAGE_UP then
-      self:move(math.floor(h/3) * -1)
+      self:move(math.floor(h/2) * -1)
       -- self:move(-10)
     end
   end)
@@ -669,9 +670,12 @@ function List:new(items, opts)
   end)
 end
 
-function List:move_to(pos)
+function List:move_to(pos, and_select)
   self.changed = true
   self.pos = pos
+  if and_select then
+    self:set_selected_item(pos, true)
+  end
 end
 
 function List:move(dir)
@@ -703,18 +707,24 @@ end
 function List:set_items(arr)
   self.items = arr
   self.pos = 1
-  self.selected = 0
-  self.changed = true
+  self:set_selected_item(0, false)
 end
 
 function List:set_item(number, item)
   self.items[number] = item
-  self.selected = 0
-  self.changed = true
+  self:set_selected_item(0, false)
 end
 
 function List:get_item(number)
   return self.items[number]
+end
+
+function List:set_selected_item(number, trigger_event)
+  self.changed = true
+  self.selected = number
+  if trigger_event then
+    self:trigger('selected', number, self:get_item(number))
+  end
 end
 
 function List:get_selected_item()
@@ -813,9 +823,7 @@ function OptionList:move(dir)
   if new_selected < self.pos or (new_selected >= self.pos + height) then
     OptionList.super.move(self, dir)
   else
-    self.changed = true
-    self.selected = new_selected
-    self:trigger('selected', new_selected, self:get_item(new_selected))
+    self:set_selected_item(new_selected, true)
   end
 end
 
@@ -825,9 +833,7 @@ function OptionList:select(number)
   if (number < 1 or not item) then return end
 
   if number ~= self.selected then
-    self.changed = true
-    self.selected = number
-    self:trigger('selected', number, item)
+    self:set_selected_item(number, true)
   end
 
   return item
@@ -1061,7 +1067,7 @@ end
 local function remove_timer(t)
   for idx, timer in ipairs(timers) do
     if timer == t then
-      timer.remove(timers, idx)
+      table.remove(timers, idx)
     end
   end
 end
@@ -1114,8 +1120,11 @@ ui.unload = unload
 ui.start  = start
 ui.stop   = stop
 ui.render = render
+
+-- timers
 ui.after  = add_timer -- ui.after(100, do_something())
 ui.every  = add_repeating_timer
+ui.cancel = remove_timer
 
 ui.Box        = Box
 ui.Label      = Label

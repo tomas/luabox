@@ -3,3 +3,5 @@ luabox.so
 luabox.o
 termbox
 layout
+libtermbox.a
+luastatic/

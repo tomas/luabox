@@ -20,11 +20,11 @@ layout: luastatic luabox.a luabox.so
 luastatic:
 	@git clone https://github.com/ers35/luastatic
 
-luabox.so: luabox.o
+luabox.a: luabox.o
 	@echo "Building $(NAME).a (archive)"
 	@ar rcs $(NAME).a $(NAME).o
 
-luabox.a: luabox.o libtermbox.a
+luabox.so: luabox.o libtermbox.a
 	@echo "Building $(NAME).so (shared library)"
 	@$(CC) -o $(NAME).so -shared $(NAME).o libtermbox.a
 

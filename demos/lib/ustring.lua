@@ -346,7 +346,8 @@ function ustring.len( s )
   checkString( 'len', s )
   local cps = utf8_explode( s )
   if cps == nil then
-    return nil
+    -- return nil
+    return -1
   else
     return cps.len
   end
@@ -371,13 +372,17 @@ end
 -- @param j int  Ending character [default -1]
 -- @return string
 function ustring.sub( s, i, j )
+  if i == 0 and j == 0 then
+    return ''
+  end
+
   checkString( 'sub', s )
   checkType( 'sub', 2, i, 'number', true )
   checkType( 'sub', 3, j, 'number', true )
   local cps = utf8_explode( s )
   if cps == nil then
     error( "bad argument #1 for 'sub' (string is not UTF-8)", 2 )
-  end
+  end 
   i = i or 1
   if i < 0 then
     i = cps.len + i + 1

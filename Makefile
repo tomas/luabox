@@ -28,6 +28,7 @@ luabox.so: luabox.o libtermbox.a
 	@echo "Building $(NAME).so (shared library)"
 	@$(CC) -o $(NAME).so -shared $(NAME).o libtermbox.a
 
+.PHONY:luabox.o
 luabox.o: termbox
 	@echo "Building layout.o"
 	@$(CC) $(CFLAGS) $(LUAINC) -I termbox/src/ -c -Wall -Werror -fPIC $(NAME).c

@@ -5,6 +5,9 @@
 #include <termbox.h>
 #include "util.h"
 
+static int char_len;
+static char utf8_char[5];
+
 #if defined(LUA_VERSION_NUM) && LUA_VERSION_NUM == 501
 
 #if !defined(luaL_newlibtable) // detect if luajit >= 2.1
@@ -234,10 +237,12 @@ void populate_event(lua_State *L) {
     lua_setfield(L, 1, "clicks"); // click count
 
   } else if (event.type == TB_EVENT_KEY) {
-    char string[2] = {event.ch,'\0'};
-    string[0] = event.ch;
 
-    lua_pushstring(L, string);
+
+    char_len = tb_utf8_unicode_to_char(utf8_char, event.ch);
+    utf8_char[char_len] = '\0';
+
+    lua_pushstring(L, utf8_char);
     lua_setfield(L, 1, "ch");
 
   } else if (event.type == TB_EVENT_RESIZE) {

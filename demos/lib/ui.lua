@@ -411,7 +411,7 @@ function TextBox:render_self()
   while ustring.len(str) > 0 do
     linebreak = string.find(str, '\n')
     if linebreak and linebreak <= width then
-      line = ustring.sub(str, 1, linebreak - 1)
+      line = ustring.sub(str, 0, linebreak - 1)
       limit = linebreak + 1
     else
       -- check if remaining string is shorter than width
@@ -494,7 +494,7 @@ function EditableTextBox:append_char(char)
   if self.cursor_pos == self.chars then
     self.text = self.text .. char
   else
-    self.text = ustring.sub(self.text, 0, self.cursor_pos) .. char .. ustring.sub(self.text, self.cursor_pos+1)
+    self.text = ustring.sub(self.text, 0, self.cursor_pos) .. char .. ustring.sub(self.text, self.cursor_pos + 1)
   end
 
   self.chars = self.chars + 1
@@ -509,7 +509,7 @@ function EditableTextBox:delete_char(at)
   if self.cursor_pos == self.chars then
     self.text = ustring.sub(self.text, 0, self.chars + at)
   else
-    self.text = ustring.sub(self.text, 0, self.cursor_pos + at) .. ustring.sub(self.text, self.cursor_pos+(at+2))
+    self.text = ustring.sub(self.text, 0, self.cursor_pos + at) .. ustring.sub(self.text, self.cursor_pos + (at + 2))
   end
 
   self.chars = self.chars - 1
@@ -777,7 +777,7 @@ function List:render_self()
     if diff >= 0 then -- line is shorter than width
       formatted = formatted -- .. string.rep(' ', diff)
     else -- line is longer, so cut!
-      formatted = ustring.sub(formatted, 1, rounded_width-1) .. '$'
+      formatted = ustring.sub(formatted, 0, rounded_width-1) .. '$'
     end
 
     -- debug({ " --> line " .. index , formatted })

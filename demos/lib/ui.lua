@@ -1,6 +1,7 @@
 local tb = require('luabox')
 local Object  = require('demos.lib.classic')
 local Emitter = require('demos.lib.events')
+local ustring = require('demos.lib.ustring')
 
 -- gettime function, for timers
 
@@ -391,7 +392,7 @@ end
 function TextBox:set_text(text)
   self.changed = true
   self.text = text or '' -- :gsub("\n", " ")
-  self.chars = self.text:len()
+  self.chars = ustring.len(self.text)
 end
 
 function TextBox:get_text()
@@ -407,19 +408,19 @@ function TextBox:render_self()
   local width, height = self:size()
 
   local n, str, line, linebreak, limit = 0, self.text, nil, nil
-  while string.len(str) > 0 do
+  while ustring.len(str) > 0 do
     linebreak = string.find(str, '\n')
     if linebreak and linebreak <= width then
-      line = str:sub(0, linebreak - 1)
+      line = ustring.sub(str, 1, linebreak - 1)
       limit = linebreak + 1
     else
       -- check if remaining string is shorter than width
-      local diff = width - str:len()
+      local diff = width - ustring.len(str)
 
       if diff > 0 then -- yep, this is the last line
         line = str -- .. string.rep(' ', diff) -- fill with empty spaces
       else
-        line = str:sub(0, width)
+        line = ustring.sub(str, 0, width)
       end
 
       limit = width + 1
@@ -427,7 +428,7 @@ function TextBox:render_self()
 
     tb.string(x, y + n, fg, bg, line)
     n = n + 1
-    str = str:sub(limit)
+    str = ustring.sub(str, limit)
   end
 
   self.lines = n
@@ -460,7 +461,7 @@ function EditableTextBox:handle_key(key, meta)
   elseif key == tb.KEY_HOME or key == tb.KEY_CTRL_A then
     self.cursor_pos = 0
   elseif key == tb.KEY_END or key == tb.KEY_CTRL_E then
-    self.cursor_pos = self.text:len()
+    self.cursor_pos = ustring.len(self.text)
   elseif key == tb.KEY_ARROW_LEFT then
     self:move_cursor(-1)
   elseif key == tb.KEY_ARROW_RIGHT then
@@ -493,7 +494,7 @@ function EditableTextBox:append_char(char)
   if self.cursor_pos == self.chars then
     self.text = self.text .. char
   else
-    self.text = self.text:sub(0, self.cursor_pos) .. char .. self.text:sub(self.cursor_pos+1)
+    self.text = ustring.sub(self.text, 0, self.cursor_pos) .. char .. ustring.sub(self.text, self.cursor_pos+1)
   end
 
   self.chars = self.chars + 1
@@ -506,9 +507,9 @@ function EditableTextBox:delete_char(at)
   end
 
   if self.cursor_pos == self.chars then
-    self.text = self.text:sub(0, self.chars + at)
+    self.text = ustring.sub(self.text, 0, self.chars + at)
   else
-    self.text = self.text:sub(0, self.cursor_pos + at) .. self.text:sub(self.cursor_pos+(at+2))
+    self.text = ustring.sub(self.text, 0, self.cursor_pos + at) .. ustring.sub(self.text, self.cursor_pos+(at+2))
   end
 
   self.chars = self.chars - 1
@@ -527,7 +528,7 @@ end
 
 function EditableTextBox:get_cursor_offset(width)
   local pos = self.cursor_pos
-  local str = self.text:sub(0, self.cursor_pos)
+  local str = ustring.sub(self.text, 0, self.cursor_pos)
 
   if pos < width and not contains_newline(str, width-1) then
     return pos, 0
@@ -539,24 +540,24 @@ function EditableTextBox:get_cursor_offset(width)
 
     nextbreak = string.find(str, '\n')
     if nextbreak and nextbreak <= width then
-      line  = str:sub(0, nextbreak-1)
+      line  = ustring.sub(str, 0, nextbreak-1)
       limit = nextbreak + 1
       chars = chars + nextbreak
     else
-      line = str:sub(0, width)
+      line = ustring.sub(str, 0, width)
       limit = width + 1
       chars = chars + width
     end
 
     n = n + 1
-    str = str:sub(limit)
+    str = ustring.sub(str, limit)
     -- debug(string.format("chars: %d, pos: %d, width: %d, break: %d, line len: %d", chars, pos, width, nextbreak or '-1', line:len()))
 
     if chars == pos then
       y = n
       x = 0
       break
-    elseif (chars < pos and chars + line:len() > pos) then
+    elseif (chars < pos and chars + ustring.len(line) > pos) then
       if not contains_newline(str, pos - chars) then
         y = n
         x = pos - chars
@@ -564,7 +565,7 @@ function EditableTextBox:get_cursor_offset(width)
       end
     elseif chars > pos then
       y = n-1
-      x = line:len()
+      x = ustring.len(line)
       break
     end
   end
@@ -573,7 +574,7 @@ function EditableTextBox:get_cursor_offset(width)
 end
 
 function EditableTextBox:get_char_at_pos(pos)
-  return self.text:sub(pos, pos)
+  return ustring.sub(self.text, pos, pos)
 end
 
 function EditableTextBox:render_cursor()
@@ -619,7 +620,7 @@ function Label:render_self()
   local fg, bg = self:colors()
   local width, height = self:size()
 
-  tb.string(x, y, fg, bg, self.text:sub(0, width))
+  tb.string(x, y, fg, bg, ustring.sub(self.text, 0, width))
 end
 
 -----------------------------------------
@@ -772,11 +773,11 @@ function List:render_self()
     if not item then break end
 
     formatted = self:format_item(item)
-    diff = width - formatted:len()
+    diff = width - ustring.len(formatted)
     if diff >= 0 then -- line is shorter than width
       formatted = formatted -- .. string.rep(' ', diff)
     else -- line is longer, so cut!
-      formatted = formatted:sub(0, rounded_width-1) .. '$'
+      formatted = ustring.sub(formatted, 1, rounded_width-1) .. '$'
     end
 
     -- debug({ " --> line " .. index , formatted })
@@ -886,7 +887,7 @@ function Menu:get_longest_item()
   local res, formatted
   for _, item in ipairs(self.items) do
     formatted = self:format_item(item)
-    if not res or formatted:len() > res:len() then
+    if not res or ustring.len(formatted) > ustring.len(res) then
       res = formatted
     end
   end

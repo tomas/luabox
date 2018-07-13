@@ -6,7 +6,9 @@ LUAINC = $(shell pkg-config --cflags luajit)
 
 # for layout demo
 LUAJIT_INCLUDES = $(shell pkg-config --cflags --libs luajit)
-CFLAGS = -g -lm -lrt -no-pie # -static
+LUAJIT_LIB_PATH = $(shell pkg-config --libs-only-L luajit)
+
+CFLAGS = -g -lm -lrt # -static
 DEMO_DEPS = demos/lib/ui.lua demos/lib/classic.lua demos/lib/events.lua
 
 all: luabox.a luabox.so
@@ -26,7 +28,7 @@ luabox.a: luabox.o
 
 luabox.so: luabox.o libtermbox.a
 	@echo "Building $(NAME).so (shared library)"
-	@$(CC) -o $(NAME).so -shared $(NAME).o libtermbox.a
+	@$(CC) -o $(NAME).so -shared $(NAME).o $(LUAJIT_LIB_PATH) -lluajit-5.1 libtermbox.a
 
 .PHONY:luabox.o
 luabox.o: termbox

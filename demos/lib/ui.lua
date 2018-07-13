@@ -620,7 +620,8 @@ function Label:render_self()
   local fg, bg = self:colors()
   local width, height = self:size()
 
-  tb.string(x, y, fg, bg, ustring.sub(self.text, 0, width))
+  local str = ustring.sub(self.text, 0, math.floor(width))
+  tb.string(x, y, fg, bg, str)
 end
 
 -----------------------------------------
@@ -909,8 +910,10 @@ end
 -- load/unload UI
 
 local function load(opts)
+  local opts = opts or {}
+
   if not tb.init() then return end
-  tb.enable_mouse()
+  if opts.mouse then tb.enable_mouse() end
   tb.hide_cursor()
 
   screen = Container({

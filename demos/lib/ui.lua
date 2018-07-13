@@ -1056,8 +1056,8 @@ local function update_timers(last_time)
   for idx, timer in ipairs(timers) do
     timer.time = timer.time - delta
     if timer.time <= 0 then
-      timer.fn()
-      if timer.repeating then
+      local res = timer.fn()
+      if timer.repeating and not res then
         timer.time = timer.repeating
       else
         table.remove(timers, idx)

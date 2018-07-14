@@ -755,6 +755,11 @@ function List:selection_color(index, our_color, parent_color)
 end
 ]]--
 
+function List:render_item(formatted, line, x, y, fg, bg)
+  -- debug({ " --> line " .. index , formatted })
+  tb.string(x, y + line, fg, bg, formatted)
+end
+
 function List:render_self()
   self:clear()
 
@@ -768,21 +773,21 @@ function List:render_self()
   --   self.title:set_text("Width: " .. width .. ", rounded: " .. rounded_width)
   -- end
 
-  for line = 0, height-1, 1 do
+  for line = 0, height - 1, 1 do
     index = line + self.pos
     item = self:get_item(index)
     if not item then break end
 
     formatted = self:format_item(item)
     diff = width - ustring.len(formatted)
+
     if diff >= 0 then -- line is shorter than width
       formatted = formatted -- .. string.rep(' ', diff)
     else -- line is longer, so cut!
       formatted = ustring.sub(formatted, 0, rounded_width-1) .. '$'
     end
 
-    -- debug({ " --> line " .. index , formatted })
-    tb.string(x, y + line, self:item_fg_color(index, item, fg), self:item_bg_color(index, item, bg), formatted)
+    self:render_item(formatted, line, x, y, self:item_fg_color(index, item, fg), self:item_bg_color(index, item, bg))
   end
 end
 

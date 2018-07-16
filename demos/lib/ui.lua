@@ -686,9 +686,11 @@ function List:move(dir)
   local nitems = self:num_items()
 
   -- ensure we stay within bounds
-  if result < 1 -- and that the don't show an empty box
-    or dir > 0 and (nitems > 0 and result > (nitems - height + dir)) then
-      return
+  if result < 1 then
+    return self:move_to(1)
+  -- and that the don't show an empty box
+  elseif dir > 0 and (nitems > 0 and result > (nitems - height + dir)) then
+    return
   end
 
   self:move_to(result)

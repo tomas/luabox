@@ -1,32 +1,8 @@
-local tb = require('luabox')
+local tb      = require('luabox')
+local time    = require('demos.lib.time')
 local Object  = require('demos.lib.classic')
 local Emitter = require('demos.lib.events')
 local ustring = require('demos.lib.ustring')
-
--- gettime function, for timers
-
-local ffi = require('ffi')
-local math_floor = math.floor
-
-ffi.cdef [[
-  typedef long time_t;
-  typedef int clockid_t;
-
-  typedef struct tspec {
-      time_t tv_sec;  // secs
-      long   tv_nsec; // nanosecs
-  } nanotime;
-
-  int clock_gettime(clockid_t clk_id, struct tspec *tp);
-]]
-
-local clock = assert(ffi.new('nanotime[?]', 1))
-local gettime = ffi.C.clock_gettime
-
-local function time_now()
-  gettime(1, clock)
-  return tonumber(clock[0].tv_sec * 1000 + math_floor(tonumber(clock[0].tv_nsec/1000000)))
-end
 
 local screen, window, stopped
 local box_count = 0
@@ -1056,7 +1032,7 @@ local function add_repeating_timer(time, fn)
 end
 
 local function update_timers(last_time)
-  local now = time_now()
+  local now = time.time()
   local delta = now - last_time
   -- io.stderr:write("now: " .. now .. ", delta: " .. delta .. "\n")
 
@@ -1096,7 +1072,7 @@ local function render()
 end
 
 local function start()
-  local res, ev, last_loop = nil, {}, time_now()
+  local res, ev, last_loop = nil, {}, time.time()
   repeat
     last_loop = update_timers(last_loop)
     render()

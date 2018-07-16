@@ -1032,7 +1032,7 @@ local function add_repeating_timer(time, fn)
 end
 
 local function update_timers(last_time)
-  local now = time.time()
+  local now = (time.time() * 1000)
   local delta = now - last_time
   -- io.stderr:write("now: " .. now .. ", delta: " .. delta .. "\n")
 
@@ -1072,7 +1072,7 @@ local function render()
 end
 
 local function start()
-  local res, ev, last_loop = nil, {}, time.time()
+  local res, ev, last_loop = nil, {}, (time.time() * 1000)
   repeat
     last_loop = update_timers(last_loop)
     render()

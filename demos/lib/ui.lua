@@ -1000,7 +1000,7 @@ local function on_click(key, x, y, count, is_motion)
 
   elseif event:match('scroll_') then
     -- trigger a 'scroll' event for up/down
-    local dir = key == tb.KEY_MOUSE_WHEEL_UP and -3 or 3
+    local dir = key == tb.KEY_MOUSE_WHEEL_UP and -5 or 5
     window:trigger('mouse_event', x, y, 'scroll', dir)
   end
 

@@ -629,17 +629,17 @@ function List:new(items, opts)
       self:move_to(1, true)
     elseif key == tb.KEY_END then
       if self:num_items() > 0 then -- known item count
-        self:move_to(self:num_items() - (h-2))
+        if self:num_items() > h then
+          self:move_to(self:num_items() - (math.floor(h) - 2))
+        end
         self:set_selected_item(self:num_items(), true)
       else -- unknown, just forward one page
         self:move(math.floor(h))
       end
     elseif key == tb.KEY_PAGE_DOWN then
-      self:move(math.floor(h/2))
-      -- self:move(10)
+      self:move_page(1, math.floor(h))
     elseif key == tb.KEY_PAGE_UP then
-      self:move(math.floor(h/2) * -1)
-      -- self:move(-10)
+      self:move_page(-1, math.floor(h))
     end
   end)
 
@@ -672,6 +672,15 @@ function List:move(dir)
   self:move_to(result)
 end
 
+function List:move_page(dir, height)
+  local lines = math.floor(height/1.3) * dir
+  local cur = self.selected
+  self:move(lines)
+
+  local new_sel = cur + lines < 1 and 1 or cur + lines
+  self:set_selected_item(new_sel, true)
+end
+
 function List:num_items()
   if not self.items then
     return -1
@@ -700,6 +709,12 @@ function List:get_item(number)
 end
 
 function List:set_selected_item(number, trigger_event)
+  local nitems = self:num_items()
+
+  if nitems > 0 and number > nitems then
+    number = nitems
+  end
+
   self.changed = true
   self.selected = number
   if trigger_event then

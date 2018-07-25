@@ -5,7 +5,7 @@ if not tb.init() then
   return
 end
 
-cell = {}
+local cell = {}
 cell.ch = ' '
 cell.fg = tb.WHITE
 cell.bg = tb.GREEN
@@ -15,7 +15,7 @@ tb.char(5, 5, tb.RED, tb.WHITE, 'X') -- no return val
 tb.cell(3, 2, cell)
 tb.render() -- no return val
 
-t = {}
+local t, et = {}, nil
 repeat
   et = tb.peek_event(t, 1000)
   if et == tb.EVENT_KEY then

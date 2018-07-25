@@ -420,7 +420,7 @@ function EditableTextBox:new(text, opts)
   EditableTextBox.super.new(self, text, opts or {})
 
   self:on('key', function(key, char, meta)
-    if char == '' then
+    if char == '' or meta > 2 then
       self:handle_key(key, meta)
     else
       self:append_char(char)
@@ -430,7 +430,7 @@ function EditableTextBox:new(text, opts)
 end
 
 function EditableTextBox:handle_key(key, meta)
-  if key == tb.KEY_ENTER then
+  if key == tb.KEY_ENTER and meta == 0 then
     self:append_char('\n')
   elseif key == tb.KEY_BACKSPACE and meta == tb.META_ALT then
     self:delete_last_word()
@@ -727,7 +727,7 @@ function List:set_selected_item(number, trigger_event)
 end
 
 function List:get_selected_item()
-  return self:get_item(self.selected)
+  return self:get_item(self.selected), self.selected
 end
 
 function List:format_item(item)

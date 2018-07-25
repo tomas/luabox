@@ -383,8 +383,12 @@ function TextBox:render_self()
   local fg, bg = self:colors()
   local width, height = self:size()
 
+  width = math.floor(width)
+
   local n, str, line, linebreak, limit = 0, self.text, nil, nil
   while ustring.len(str) > 0 do
+    if n > height then break end
+
     linebreak = string.find(str, '\n')
     if linebreak and linebreak <= width then
       line = ustring.sub(str, 0, linebreak - 1)
@@ -634,7 +638,7 @@ function List:new(items, opts)
         end
         self:set_selected_item(self:num_items(), true)
       else -- unknown, just forward one page
-        self:move(math.floor(h))
+        self:move_page(1, math.floor(h))
       end
     elseif key == tb.KEY_PAGE_DOWN then
       self:move_page(1, math.floor(h))
@@ -932,6 +936,7 @@ local function load(opts)
     -- self:add(item)
     self.above_item = item
     item:toggle(true)
+    item:focus()
   end
 
   window.hide_above = function(self, item)
@@ -948,6 +953,16 @@ local function load(opts)
       -- self:remove(above_item)
       self.above_item = nil
       self:trigger('resized') -- force redraw of child elements
+    end
+  end
+
+  window.toggle_above = function(self, item)
+    if self.above_item then
+      self:hide_above(item)
+      return false
+    else
+      self:show_above(item)
+      return true
     end
   end
 

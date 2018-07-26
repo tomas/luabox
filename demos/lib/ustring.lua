@@ -205,6 +205,7 @@ function ustring.byteoffset( s, l, i )
   checkType( 'byteoffset', 2, l, 'number', true )
   checkType( 'byteoffset', 3, i, 'number', true )
   local cps = utf8_explode( s )
+
   if cps == nil then
     error( "bad argument #1 for 'byteoffset' (string is not UTF-8)", 2 )
   end
@@ -299,6 +300,40 @@ function ustring.gcodepoint( s, i, j )
   end
 end
 
+local function isEmoji(cp)
+  local res = false
+  if 0x1D000 <= cp and cp <= 0x1F77F then -- emoticons
+    res = true
+  elseif 0x2100 <= cp and cp <= 0x27BF then -- misc symbols and dingbats
+    res = true
+  elseif 0xFE00 <= cp and cp <= 0xFE0F then -- Variation Selectors
+    res = true
+  elseif 0x1F900 <= cp and cp <= 0x1F9FF then -- Supplemental Symbols and Pictographs
+    res = true
+  end
+  return res
+end
+
+-- ref: https://stackoverflow.com/questions/30757193/find-out-if-character-in-string-is-emoji
+function ustring.emojiCount(s)
+  local count = 0
+  for cp in ustring.gcodepoint(s) do
+    if isEmoji(cp) then
+      count = count + 1
+    end
+  end
+  return count
+end
+
+function ustring.replaceEmojis(s, toChar)
+  local toChar = toChar or ''
+  local chars = {}
+  for cp in ustring.gcodepoint(s) do
+    table.insert(chars, isEmoji(cp) and toChar or string.char(cp))
+  end
+  return table.concat(chars, '')
+end
+
 -- Convert codepoints to a string
 --
 -- @see string.char
@@ -353,6 +388,11 @@ function ustring.len( s )
   end
 end
 
+function ustring.lenWithEmojis(s)
+  local len = ustring.len(s)
+  return len + ustring.emojiCount(s) -- emojis count as two spaces, so add it to resulting string
+end
+
 -- Private function to return a substring of a string
 --
 -- @param s string
@@ -397,6 +437,11 @@ function ustring.sub( s, i, j )
   i = math.max( 1, math.min( i, cps.len + 1 ) )
   j = math.max( 1, math.min( j, cps.len + 1 ) )
   return sub( s, cps, i, j )
+end
+
+function ustring.subWithEmojis( s, i, j )
+  local emojis = ustring.emojiCount(s)
+  return ustring.sub(s, i, j-(emojis*2))
 end
 
 ---- Table-driven functions ----

@@ -441,11 +441,19 @@ function EditableTextBox:handle_key(key, meta)
   elseif key == tb.KEY_HOME or key == tb.KEY_CTRL_A then
     self.cursor_pos = 0
   elseif key == tb.KEY_END or key == tb.KEY_CTRL_E then
-    self.cursor_pos = ustring.len(self.text)
+    self.cursor_pos = self.chars
   elseif key == tb.KEY_ARROW_LEFT then
-    self:move_cursor(-1)
+    if meta == tb.META_CTRL then
+      self:move_cursor_to_last(' ')
+    else
+      self:move_cursor(-1)
+    end
   elseif key == tb.KEY_ARROW_RIGHT then
-    self:move_cursor(1)
+    if meta == tb.META_CTRL then
+      self:move_cursor_to_next(' ')
+    else
+      self:move_cursor(1)
+    end
   elseif key == tb.KEY_ARROW_DOWN then
     local width, height = self:size()
     self:move_cursor(math.floor(width))
@@ -463,6 +471,21 @@ function EditableTextBox:move_cursor(dir)
   end
 
   self.cursor_pos = res
+end
+
+function EditableTextBox:move_cursor_to_last(char)
+  local reverse_cursor_pos = self.chars - self.cursor_pos
+  local lastpos = string.find(self.text:reverse(), char, reverse_cursor_pos+2)
+  if lastpos and lastpos - reverse_cursor_pos > 0 then
+    self:move_cursor(-(lastpos - reverse_cursor_pos - 1)) 
+  else
+    self.cursor_pos = 0
+  end
+end
+
+function EditableTextBox:move_cursor_to_next(char)
+  local nextpos = string.find(self.text, char, self.cursor_pos+2)
+  self.cursor_pos = (nextpos and nextpos-1) or self.chars
 end
 
 function EditableTextBox:set_text(text)

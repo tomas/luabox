@@ -799,11 +799,15 @@ function List:render_self()
     if not item then break end
 
     formatted = self:format_item(item)
+    formatted = ustring.replaceEmojis(formatted, '★')
+
+    -- diff = width - ustring.lenWithEmojis(formatted)
     diff = width - ustring.len(formatted)
 
     if diff >= 0 then -- line is shorter than width
       formatted = formatted -- .. string.rep(' ', diff)
     else -- line is longer, so cut!
+      -- formatted = ustring.subWithEmojis(formatted, 0, rounded_width-1) .. '$'
       formatted = ustring.sub(formatted, 0, rounded_width-1) .. '$'
     end
 

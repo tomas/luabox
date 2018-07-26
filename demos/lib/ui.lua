@@ -626,11 +626,11 @@ function List:new(items, opts)
     local w, h = self:size()
 
     if key == tb.KEY_ARROW_DOWN then
-      self:move(1)
+      self:move(1) 
     elseif key == tb.KEY_ARROW_UP then
       self:move(-1)
     elseif key == tb.KEY_HOME then
-      self:move_to(1, true)
+      self:move_to(1, 1)
     elseif key == tb.KEY_END then
       if self:num_items() > 0 then -- known item count
         if self:num_items() > h then
@@ -652,11 +652,11 @@ function List:new(items, opts)
   end)
 end
 
-function List:move_to(pos, and_select)
+function List:move_to(pos, selected_pos)
   self.changed = true
   self.pos = pos
-  if and_select then
-    self:set_selected_item(pos, true)
+  if selected_pos then
+    self:set_selected_item(selected_pos, true)
   end
 end
 
@@ -826,9 +826,9 @@ function OptionList:move(dir)
   -- if new_selected is above position or below position + height, then also move
   if new_selected < self.pos or (new_selected >= self.pos + height) then
     OptionList.super.move(self, dir)
-  else
-    self:set_selected_item(new_selected, true)
   end
+
+  return self:set_selected_item(new_selected, true)
 end
 
 function OptionList:select(number)

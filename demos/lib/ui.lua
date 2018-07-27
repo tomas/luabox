@@ -331,10 +331,16 @@ end
 function Box:render()
   -- errwrite('rendering ' .. self.id)
   if not self.hidden then
-    if self.changed then self:render_self() end
+    if self.changed then 
+      self:render_self() 
+      self:rendered()
+    end
     self:render_tree()
-    self.changed = false
   end
+end
+
+function Box:rendered()
+  self.changed = false
 end
 
 function Box:remove_tree()
@@ -1062,7 +1068,10 @@ local function on_click(key, x, y, count, is_motion)
 end
 
 local function on_resize(w, h)
-  -- tb.resize()
+  if w > screen.width or h > screen.height then
+    tb.resize()
+  end
+
   screen.width  = w
   screen.height = h
 

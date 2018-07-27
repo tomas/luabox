@@ -438,9 +438,9 @@ function EditableTextBox:handle_key(key, meta)
     self:delete_char(-1)
   elseif key == tb.KEY_DELETE then
     self:delete_char(0)
-  elseif key == tb.KEY_HOME or key == tb.KEY_CTRL_A then
+  elseif key == tb.KEY_HOME or (key == tb.KEY_CTRL_A and meta == tb.META_CTRL) then
     self.cursor_pos = 0
-  elseif key == tb.KEY_END or key == tb.KEY_CTRL_E then
+  elseif key == tb.KEY_END or (key == tb.KEY_CTRL_E and meta == tb.META_CTRL) then
     self.cursor_pos = self.chars
   elseif key == tb.KEY_ARROW_LEFT then
     if meta == tb.META_CTRL then
@@ -775,9 +775,9 @@ function List:selection_color(index, our_color, parent_color)
 end
 ]]--
 
-function List:render_item(formatted, line, x, y, fg, bg)
+function List:render_item(formatted, x, y, fg, bg)
   -- debug({ " --> line " .. index , formatted })
-  tb.string(x, y + line, fg, bg, formatted)
+  tb.string(x, y, fg, bg, formatted)
 end
 
 function List:render_self()
@@ -809,7 +809,7 @@ function List:render_self()
       formatted = ustring.sub(formatted, 0, rounded_width-1) .. '$'
     end
 
-    self:render_item(formatted, line, x, y, self:item_fg_color(index, item, fg), self:item_bg_color(index, item, bg))
+    self:render_item(formatted, x, y + line, self:item_fg_color(index, item, fg), self:item_bg_color(index, item, bg))
   end
 end
 

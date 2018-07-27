@@ -650,13 +650,13 @@ function List:new(items, opts)
     self:focus()
   end)
 
-  self:on('key', function(key, ch)
+  self:on('key', function(key, ch, meta)
     self.changed = true
     local w, h = self:size()
 
-    if key == tb.KEY_ARROW_DOWN then
+    if key == tb.KEY_ARROW_DOWN or (ch == 'j' and meta == 0) then
       self:move(1) 
-    elseif key == tb.KEY_ARROW_UP then
+    elseif key == tb.KEY_ARROW_UP or (ch == 'k' and meta == 0) then
       self:move(-1)
     elseif key == tb.KEY_HOME then
       self:move_to(1, 1)

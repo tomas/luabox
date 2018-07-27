@@ -240,7 +240,8 @@ function ustring.codepoint( s, i, j )
   checkType( 'codepoint', 3, j, 'number', true )
   local cps = utf8_explode( s )
   if cps == nil then
-    error( "bad argument #1 for 'codepoint' (string is not UTF-8)", 2 )
+    -- error( "bad argument #1 for 'codepoint' (string is not UTF-8)", 2 )
+    return -1
   end
   i = i or 1
   if i < 0 then
@@ -273,7 +274,10 @@ function ustring.gcodepoint( s, i, j )
   checkType( 'gcodepoint', 3, j, 'number', true )
   local cps = utf8_explode( s )
   if cps == nil then
-    error( "bad argument #1 for 'gcodepoint' (string is not UTF-8)", 2 )
+    -- error( "bad argument #1 for 'gcodepoint' (string is not UTF-8)", 2 )
+    return function ()
+      return nil
+    end
   end
   i = i or 1
   if i < 0 then
@@ -301,6 +305,8 @@ function ustring.gcodepoint( s, i, j )
 end
 
 local function isEmoji(cp)
+  if not cp then return false end
+
   local res = false
   if 0x1D000 <= cp and cp <= 0x1F77F then -- emoticons
     res = true

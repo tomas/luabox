@@ -1062,7 +1062,7 @@ local function on_click(key, x, y, count, is_motion)
 end
 
 local function on_resize(w, h)
-  tb.resize()
+  -- tb.resize()
   screen.width  = w
   screen.height = h
 

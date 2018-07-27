@@ -50,7 +50,7 @@ window:add(footer)
 local label = ui.Label("Some list", { left = 1, right = 1, bg = tb.GREEN })
 left:add(label)
 
-local editor = ui.EditableTextBox("Foo bar text", { left = 1, right = 1, top = 2, focus_fg = tb.rgb(0xFFCC00) })
+local editor = ui.EditableTextBox("Foo bar😀 text", { left = 1, right = 1, top = 2, focus_fg = tb.rgb(0xFFCC00) })
 left:add(editor)
 
 para:focus()

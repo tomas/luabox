@@ -329,7 +329,7 @@ function ustring.replaceEmoji(s, toChar)
   local toChar = toChar or ' '
   local chars = {}
   for cp in ustring.gcodepoint(s) do
-    table.insert(chars, isEmoji(cp) and toChar or string.char(cp))
+    table.insert(chars, isEmoji(cp) and toChar or ustring.char(cp))
   end
   return table.concat(chars, '')
 end

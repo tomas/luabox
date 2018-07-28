@@ -862,10 +862,21 @@ function OptionList:move(dir)
   return self:set_selected_item(new_selected, true)
 end
 
-function OptionList:select(number)
+function OptionList:select(number, clamp)
+  if clamp then
+    if number < 1 then 
+      number = 1 
+    else
+      local nitems = self:num_items()
+      if nitems and nitems > 0 and number > nitems then
+        number = nitems
+      end
+    end
+  end
+
   -- check if within bounds and actually changed
   local item = self:get_item(number)
-  if (number < 1 or not item) then return end
+  if not item then return end
 
   if number ~= self.selected then
     self:set_selected_item(number, true)

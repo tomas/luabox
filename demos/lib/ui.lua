@@ -977,6 +977,7 @@ local function load(opts)
     end
     -- self:add(item)
     self.above_item = item
+    self.last_focused = self.focused
     item:toggle(true)
     item:focus()
   end
@@ -989,7 +990,12 @@ local function load(opts)
 
       self.above_item:toggle(false)
       if self.focused == self.above_item then
-        self.focused:unfocus()
+        if self.last_focused then
+          self.last_focused:focus()
+          self.last_focused = nil
+        else
+          self.focused:unfocus()
+        end
       end
 
       -- self:remove(above_item)

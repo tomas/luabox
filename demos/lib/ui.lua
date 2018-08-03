@@ -826,8 +826,8 @@ local OptionList = List:extend()
 function OptionList:new(items, opts)
   OptionList.super.new(self, items, opts)
 
-  self:on('key', function(key, ch)
-    if ch == ' ' then -- space key
+  self:on('key', function(key, ch, meta)
+    if ch == ' ' or (key == tb.KEY_ENTER and meta == 0) then -- space or enter 
       self:submit()
     end
   end)
@@ -904,7 +904,7 @@ function Menu:new(items, opts)
   self.max_height = opts.max_height or 10
 
   -- selected is triggered on left click
-  self:on('selected', function(index, item)
+  self:on('left_click', function(index, item)
     self:submit()
   end)
 

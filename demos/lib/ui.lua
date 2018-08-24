@@ -951,6 +951,32 @@ function Menu:size()
 end
 
 -----------------------------------------
+
+local AutocompleteMenu = Menu:extend()
+
+function AutocompleteMenu:new(items, opts)
+  AutocompleteMenu.super.new(self, items, opts)
+  self.original_items = items
+
+  self.input = EditableTextBox("", { top = 1, left = 1, right = 1 })
+
+  self.on('key', function(ch, key, meta)
+    self.input:trigger('key', ch, key, meta)
+    self:sort_options()
+  end)
+end
+
+function AutocompleteMenu:sort_options()
+  self.items = fuzzel.fad(self.input:get_text(), self.original_items)
+end
+
+function AutocompleteMenu:render_self()
+  -- self.input.render_self()
+  AutocompleteMenu.super.render_self(self)
+  -- render input
+end
+
+-----------------------------------------
 -- load/unload UI
 
 local function load(opts)

@@ -669,9 +669,9 @@ function List:new(items, opts)
       else -- unknown, just forward one page
         self:move_page(1, math.floor(h))
       end
-    elseif key == tb.KEY_PAGE_DOWN then
+    elseif key == tb.KEY_PAGE_DOWN and meta == 0 then
       self:move_page(1, math.floor(h))
-    elseif key == tb.KEY_PAGE_UP then
+    elseif key == tb.KEY_PAGE_UP and meta == 0 then
       self:move_page(-1, math.floor(h))
     end
   end)

@@ -66,6 +66,7 @@ function Events:emit(ev, ...)
     if (evtbl ~= nil) then
         for _, lsn in ipairs(evtbl) do
             local status, err = pcall(lsn, ...)
+            if err == false then break end
             if not (status) then print(string.sub(_, PFX_LEN + 1) .. " emit error: " .. tostring(err)) end
         end
     end

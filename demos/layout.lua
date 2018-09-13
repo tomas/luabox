@@ -5,6 +5,8 @@ local tb = require('luabox')
 
 local window = ui.load()
 
+tb.enable_mouse()
+
 -- create a 10x10 rectangle at coordinates 5x5
 if not window then
   print "Unable to load UI."
@@ -47,11 +49,14 @@ right:add(para)
 local footer = ui.Box({ height = 1, position = "bottom", bg = tb.BLACK })
 window:add(footer)
 
-local label = ui.Label("Some list", { left = 1, right = 1, bg = tb.GREEN })
-left:add(label)
+-- local label = ui.Label("Some list", { left = 1, right = 1, bg = tb.GREEN })
+-- left:add(label)
 
-local editor = ui.EditableTextBox("Foo bar😀 text", { left = 1, right = 1, top = 2, focus_fg = tb.rgb(0xFFCC00) })
-left:add(editor)
+-- local editor = ui.EditableTextBox("Foo bar😀 text", { left = 1, right = 1, top = 2, focus_fg = tb.rgb(0xFFCC00) })
+-- left:add(editor)
+
+local autocomplete = ui.AutocompleteMenu({ "foo", "bar", "foreman", "xxx", "yyy", "xyz" }, { hidden = false, width = 10, top = 2, height = 5, bg = tb.CYAN })
+left:add(autocomplete)
 
 para:focus()
 ui.start()

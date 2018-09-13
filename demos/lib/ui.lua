@@ -42,6 +42,54 @@ function contains_newline(str, stop)
   return subs:find('\n')
 end
 
+
+-----------------------------------------
+-- timers
+
+local timers = {}
+
+local function add_timer(time, fn, repeating)
+  local t = { time = time, fn = fn, repeating = repeating and time or nil }
+  table.insert(timers, t)
+  return t
+end
+
+local function add_repeating_timer(time, fn)
+  return add_timer(time, fn, true)
+end
+
+local function update_timers(last_time)
+  local now = (time.time() * 1000)
+  local delta = now - last_time
+  -- io.stderr:write("now: " .. now .. ", delta: " .. delta .. "\n")
+
+  for idx, timer in ipairs(timers) do
+    timer.time = timer.time - delta
+    if timer.time <= 0 then
+      local res = timer.fn()
+      if timer.repeating and not res then
+        timer.time = timer.repeating
+      else
+        table.remove(timers, idx)
+      end
+    end
+  end
+
+  return now
+end
+
+local function remove_timer(t)
+  for idx, timer in ipairs(timers) do
+    if timer == t then
+      table.remove(timers, idx)
+    end
+  end
+end
+
+local function clear_timers()
+  timers = {}
+end
+
 -------------------------------------------------------------
 
 local Rect = Object:extend()
@@ -392,8 +440,7 @@ function TextBox:render_self()
   width = math.floor(width)
 
   local n, str, line, linebreak, limit = 0, self.text, nil, nil
-  while ustring.len(str) > 0 do
-    if n > height then break end
+  while ustring.len(str) > 0 and n < height do
 
     linebreak = string.find(str, '\n')
     if linebreak and linebreak <= width then
@@ -593,6 +640,11 @@ function EditableTextBox:render_cursor()
 
   local cursor_x, cursor_y = self:get_cursor_offset(math.floor(width))
   local char = self:get_char_at_pos(self.cursor_pos+1)
+
+  if cursor_y >= height then 
+    return -- don't render cursor, we're off limits
+  end
+
   tb.string(x + cursor_x, y + cursor_y, fg, tb.RED, (char == '' or char == '\n') and ' ' or char)
 end
 
@@ -898,10 +950,7 @@ local Menu = OptionList:extend()
 
 function Menu:new(items, opts)
   Menu.super.new(self, items, opts)
-  self.hidden = true
-
-  self.max_width  = opts.max_width -- otherwise, longest element + 1
-  self.max_height = opts.max_height or 10
+  self.hidden = opts.hidden == nil and true or opts.hidden
 
   -- selected is triggered on left click
   self:on('left_click', function(index, item)
@@ -941,7 +990,8 @@ function Menu:get_longest_item()
 end
 
 function Menu:size()
-  local w, h = self.width, table.getn(self.items)
+  local w = self.width
+  local h = self.height or table.getn(self.items)
 
   if not w then
     w = string.len(self:get_longest_item())
@@ -952,29 +1002,63 @@ end
 
 -----------------------------------------
 
-local AutocompleteMenu = Menu:extend()
+local AutocompleteMenu = Box:extend()
 
 function AutocompleteMenu:new(items, opts)
-  AutocompleteMenu.super.new(self, items, opts)
+  local box_opts = { width = 10, top = 2, height = 1, bg = tb.CYAN }
+
+  AutocompleteMenu.super.new(self, box_opts)
   self.original_items = items
 
-  self.input = EditableTextBox("", { top = 1, left = 1, right = 1 })
+  self.input = EditableTextBox("", { bg = tb.WHITE, fg = tb.BLACK, height = 1 })
+  self:add(self.input)
 
-  self.on('key', function(ch, key, meta)
-    self.input:trigger('key', ch, key, meta)
-    self:sort_options()
+  local menu_height = opts.height and opts.height - 1 or nil
+  self.menu = Menu(items, { width = opts.width, height = menu_height, top = 1, bottom = 0 })
+  self:add(self.menu)
+
+  self.input:on('focused', function()
+    self.menu:toggle(true)
+    local w, h = self.menu:size()
+    self.height = h+1
   end)
+
+  self.input:on('unfocused', function()
+    if not self.menu:is_focused() then
+      self:close()
+    end
+  end)
+
+  self.menu:on('submit', function()
+    add_timer(120, function()
+      self:close()
+    end)
+  end)
+
+  -- self:on('left_click', function(mouse_x, mouse_y)
+  --   self.input:focus()
+  -- end)
+
+  -- self:on('key', function(ch, key, meta)
+  --   self.input:trigger('key', ch, key, meta)
+  --   -- self:sort_options()
+  -- end)
+end
+
+function AutocompleteMenu:close()
+  self.menu:toggle(false)
+  self.input.changed = true
+  self.parent.changed = true
 end
 
 function AutocompleteMenu:sort_options()
-  self.items = fuzzel.fad(self.input:get_text(), self.original_items)
+  -- self.items = fuzzel.fad(self.input:get_text(), self.original_items)
 end
 
-function AutocompleteMenu:render_self()
-  -- self.input.render_self()
-  AutocompleteMenu.super.render_self(self)
-  -- render input
-end
+-- function AutocompleteMenu:render_self()
+--   self.input:render_self()
+--   self.menu:render_self()
+-- end
 
 -----------------------------------------
 -- load/unload UI
@@ -1124,53 +1208,6 @@ local function on_resize(w, h)
 end
 
 -----------------------------------------
--- timers
-
-local timers = {}
-
-local function add_timer(time, fn, repeating)
-  local t = { time = time, fn = fn, repeating = repeating and time or nil }
-  table.insert(timers, t)
-  return t
-end
-
-local function add_repeating_timer(time, fn)
-  return add_timer(time, fn, true)
-end
-
-local function update_timers(last_time)
-  local now = (time.time() * 1000)
-  local delta = now - last_time
-  -- io.stderr:write("now: " .. now .. ", delta: " .. delta .. "\n")
-
-  for idx, timer in ipairs(timers) do
-    timer.time = timer.time - delta
-    if timer.time <= 0 then
-      local res = timer.fn()
-      if timer.repeating and not res then
-        timer.time = timer.repeating
-      else
-        table.remove(timers, idx)
-      end
-    end
-  end
-
-  return now
-end
-
-local function remove_timer(t)
-  for idx, timer in ipairs(timers) do
-    if timer == t then
-      table.remove(timers, idx)
-    end
-  end
-end
-
-local function clear_timers()
-  timers = {}
-end
-
------------------------------------------
 -- loop start/stop/render
 
 local function render()
@@ -1227,5 +1264,6 @@ ui.EditableTextBox = EditableTextBox
 ui.List       = List
 ui.OptionList = OptionList
 ui.Menu       = Menu
+ui.AutocompleteMenu = AutocompleteMenu
 
 return ui

@@ -719,12 +719,12 @@ function List:new(items, opts)
         end
         self:set_selected_item(self:num_items(), true)
       else -- unknown, just forward one page
-        self:move_page(1, math.floor(h))
+        self:move_page(1, h)
       end
     elseif key == tb.KEY_PAGE_DOWN and meta == 0 then
-      self:move_page(1, math.floor(h))
+      self:page_down(h)
     elseif key == tb.KEY_PAGE_UP and meta == 0 then
-      self:move_page(-1, math.floor(h))
+      self:page_up(h)
     end
   end)
 
@@ -742,7 +742,7 @@ function List:move_to(pos, selected_pos)
 end
 
 function List:move(dir)
-  local result = dir + self.pos
+  local result = math.floor(dir) + self.pos
   local width, height = self:size()
   local nitems = self:num_items()
 
@@ -755,6 +755,14 @@ function List:move(dir)
   end
 
   self:move_to(result)
+end
+
+function List:page_up(height)
+  return self:move_page(-1, height)
+end
+
+function List:page_down(height)
+  return self:move_page(1, height)
 end
 
 function List:move_page(dir, height)

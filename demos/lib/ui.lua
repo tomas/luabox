@@ -823,6 +823,14 @@ function List:format_item(item)
   return tostring(item)
 end
 
+function List:fix_encoding(str)
+  if ustring.emojiCount(str) > 0 then 
+    return ustring.replaceEmoji(str, ' ') 
+  else
+    return str
+  end
+end
+
 function List:item_fg_color(index, item, default_color)
   return index == self.selected and self.selection_fg or default_color
 end
@@ -865,17 +873,16 @@ function List:render_self()
     if not item then break end
 
     formatted = self:format_item(item)
-    if ustring.emojiCount(formatted) > 0 then formatted = ustring.replaceEmoji(formatted, '◯') end
-
-    diff = width - ustring.len(formatted)
+    final     = self:fix_encoding(formatted)
+    diff      = width - ustring.len(final)
 
     if diff >= 0 then -- line is shorter than width
-      formatted = formatted -- .. string.rep(' ', diff)
+      final = final -- .. string.rep(' ', diff)
     else -- line is longer, so cut!
-      formatted = ustring.sub(formatted, 0, rounded_width-1) .. '$'
+      final = ustring.sub(final, 0, rounded_width-1) .. '$'
     end
 
-    self:render_item(formatted, x, y + line, self:item_fg_color(index, item, fg), self:item_bg_color(index, item, bg))
+    self:render_item(final, x, y + line, self:item_fg_color(index, item, fg), self:item_bg_color(index, item, bg))
   end
 end
 

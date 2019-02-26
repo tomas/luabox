@@ -865,7 +865,7 @@ function List:render_self()
     if not item then break end
 
     formatted = self:format_item(item)
-    if ustring.emojiCount(formatted) > 0 then formatted = ustring.replaceEmoji(formatted, '★') end
+    if ustring.emojiCount(formatted) > 0 then formatted = ustring.replaceEmoji(formatted, '◯') end
 
     diff = width - ustring.len(formatted)
 

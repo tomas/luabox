@@ -379,8 +379,8 @@ end
 function Box:render()
   -- errwrite('rendering ' .. self.id)
   if not self.hidden then
-    if self.changed then 
-      self:render_self() 
+    if self.changed then
+      self:render_self()
       self:rendered()
     end
     self:render_tree()
@@ -404,6 +404,37 @@ function Box:remove()
   self:remove_tree()
   self.emitter:removeAllListeners()
   self.hidden = true
+end
+
+
+----------------------------------------
+
+local Label = Box:extend()
+
+function Label:new(text, opts)
+  Label.super.new(self, opts or {})
+  self.height = 1
+  self.text = text
+end
+
+function Label:get_text(text)
+  return self.text
+end
+
+function Label:set_text(text)
+  self.text = text
+  self.changed = true
+end
+
+function Label:render_self()
+  Label.super.render_self(self)
+
+  local x, y = self:offset()
+  local fg, bg = self:colors()
+  local width, height = self:size()
+
+  local str = ustring.sub(self.text, 0, math.floor(width))
+  tb.string(x, y, fg, bg, str)
 end
 
 ----------------------------------------
@@ -530,7 +561,7 @@ function EditableTextBox:move_cursor_to_last(char)
   local reverse_cursor_pos = self.chars - self.cursor_pos
   local lastpos = string.find(self.text:reverse(), char, reverse_cursor_pos+2)
   if lastpos and lastpos - reverse_cursor_pos > 0 then
-    self:move_cursor(-(lastpos - reverse_cursor_pos - 1)) 
+    self:move_cursor(-(lastpos - reverse_cursor_pos - 1))
   else
     self.cursor_pos = 0
   end
@@ -641,7 +672,7 @@ function EditableTextBox:render_cursor()
   local cursor_x, cursor_y = self:get_cursor_offset(math.floor(width))
   local char = self:get_char_at_pos(self.cursor_pos+1)
 
-  if cursor_y >= height then 
+  if cursor_y >= height then
     return -- don't render cursor, we're off limits
   end
 
@@ -653,36 +684,6 @@ function EditableTextBox:render_self()
   if (self:is_focused()) then
     self:render_cursor()
   end
-end
-
-----------------------------------------
-
-local Label = Box:extend()
-
-function Label:new(text, opts)
-  Label.super.new(self, opts or {})
-  self.height = 1
-  self.text = text
-end
-
-function Label:get_text(text)
-  return self.text
-end
-
-function Label:set_text(text)
-  self.text = text
-  self.changed = true
-end
-
-function Label:render_self()
-  Label.super.render_self(self)
-
-  local x, y = self:offset()
-  local fg, bg = self:colors()
-  local width, height = self:size()
-
-  local str = ustring.sub(self.text, 0, math.floor(width))
-  tb.string(x, y, fg, bg, str)
 end
 
 -----------------------------------------
@@ -707,7 +708,7 @@ function List:new(items, opts)
     local w, h = self:size()
 
     if key == tb.KEY_ARROW_DOWN or (ch == 'j' and meta == 0) then
-      self:move(1) 
+      self:move(1)
     elseif key == tb.KEY_ARROW_UP or (ch == 'k' and meta == 0) then
       self:move(-1)
     elseif key == tb.KEY_HOME then
@@ -824,8 +825,8 @@ function List:format_item(item)
 end
 
 function List:fix_encoding(str)
-  if ustring.emojiCount(str) > 0 then 
-    return ustring.replaceEmoji(str, ' ') 
+  if ustring.emojiCount(str) > 0 then
+    return ustring.replaceEmoji(str, ' ')
   else
     return str
   end
@@ -894,7 +895,7 @@ function OptionList:new(items, opts)
   OptionList.super.new(self, items, opts)
 
   self:on('key', function(key, ch, meta)
-    if ch == ' ' or (key == tb.KEY_ENTER and meta == 0) then -- space or enter 
+    if ch == ' ' or (key == tb.KEY_ENTER and meta == 0) then -- space or enter
       self:submit()
     end
   end)
@@ -931,8 +932,8 @@ end
 
 function OptionList:select(number, clamp)
   if clamp then
-    if number < 1 then 
-      number = 1 
+    if number < 1 then
+      number = 1
     else
       local nitems = self:num_items()
       if nitems and nitems > 0 and number > nitems then
@@ -1017,25 +1018,30 @@ end
 
 -----------------------------------------
 
-local AutocompleteMenu = Box:extend()
+local SearcheableMenu = Box:extend()
 
-function AutocompleteMenu:new(items, opts)
+function SearcheableMenu:new(items, opts)
   local box_opts = { width = 10, top = 2, height = 1, bg = tb.CYAN }
 
-  AutocompleteMenu.super.new(self, box_opts)
+  SearcheableMenu.super.new(self, box_opts)
   self.original_items = items
+  self.selected_item = 0
+  self.revealed = false
 
-  self.input = EditableTextBox("", { bg = tb.WHITE, fg = tb.BLACK, height = 1 })
+  self.placeholder = opts.placeholder or ''
+  self.input = EditableTextBox(self.placeholder, { bg = tb.WHITE, fg = tb.BLACK, height = 1 })
   self:add(self.input)
 
   local menu_height = opts.height and opts.height - 1 or nil
   self.menu = Menu(items, { width = opts.width, height = menu_height, top = 1, bottom = 0 })
   self:add(self.menu)
 
-  self.input:on('focused', function()
-    self.menu:toggle(true)
-    local w, h = self.menu:size()
-    self.height = h+1
+  -- self.input:on('focused', function()
+  --   self:reveal()
+  -- end)
+
+  self.input:on('click', function()
+    self:reveal()
   end)
 
   self.input:on('unfocused', function()
@@ -1044,33 +1050,97 @@ function AutocompleteMenu:new(items, opts)
     end
   end)
 
-  self.menu:on('submit', function()
-    add_timer(120, function()
-      self:close()
-    end)
+  self.menu:on('submit', function(number, value)
+    self:select_option(value)
   end)
 
-  -- self:on('left_click', function(mouse_x, mouse_y)
-  --   self.input:focus()
-  -- end)
-
-  -- self:on('key', function(ch, key, meta)
-  --   self.input:trigger('key', ch, key, meta)
-  --   -- self:sort_options()
-  -- end)
+  self.input:on('key', function(key, ch, meta)
+    if key == tb.KEY_ESC then
+      self:close()
+      self.menu:focus()
+    elseif key == tb.KEY_ARROW_DOWN then
+      self:reveal()
+      self:set_selected_item(1)
+    elseif key == tb.KEY_ARROW_UP then
+      self:reveal()
+      self:set_selected_item(-1)
+    elseif key == tb.KEY_ENTER then
+      -- self.menu:submit()
+      if self.revealed then self:select_option(self.menu:get_selected_item()) end
+    elseif ch then
+      if not self.revealed then
+        self:reveal(self.input:get_text())
+      end
+      self:filter_options(self.input:get_text())
+    end
+  end)
 end
 
-function AutocompleteMenu:close()
+function SearcheableMenu:reveal(input_text)
+  if self.revealed then return false end
+  self.revealed = true
+
+  if input_text then self.input:set_text(input_text) end
+  self.menu:toggle(true)
+  if self.selected_item == 0 then self:set_selected_item() end
+  local w, h = self.menu:size()
+  self.height = h+1
+end
+
+function SearcheableMenu:close()
   self.menu:toggle(false)
   self.input.changed = true
   self.parent.changed = true
+  self.revealed = false
 end
 
-function AutocompleteMenu:sort_options()
-  -- self.items = fuzzel.fad(self.input:get_text(), self.original_items)
+function SearcheableMenu:set_selected_item(dir)
+  local w, h = self.menu:size()
+  local x, y = self.menu:offset()
+
+  if dir then
+    local res = self.selected_item + dir
+    if res < 1 or res > self.menu:num_items() then return end
+
+    if res > h then
+      self.menu:move(1)
+    elseif res < y then
+      self.menu:move(-1)
+    end
+
+    self.selected_item = res
+  else
+    self.selected_item = 1
+  end
+
+  self.menu:set_selected_item(self.selected_item)
 end
 
--- function AutocompleteMenu:render_self()
+function SearcheableMenu:select_option(value)
+  self.input:set_text(value)
+  add_timer(120, function()
+    self:close()
+  end)
+
+  self.input:focus()
+  self:trigger('selected', value)
+end
+
+function SearcheableMenu:set_options(arr)
+  self.menu:set_items(arr)
+  self.menu:move_to(1, 1)
+end
+
+function SearcheableMenu:filter_options(str)
+  local arr = {}
+  for _, item in ipairs(self.original_items) do
+    if string.find(item, str) then table.insert(arr, item) end
+  end
+
+  self:set_options(arr)
+end
+
+-- function SearcheableMenu:render_self()
 --   self.input:render_self()
 --   self.menu:render_self()
 -- end
@@ -1241,7 +1311,7 @@ local function start()
       if ev.key == tb.KEY_ESC and window.above_item then
         window:hide_above()
       else
-        if ev.key == tb.KEY_ESC or ev.key == tb.KEY_CTRL_C or ev.key == tb.KEY_CTRL_Q then break end
+        if ev.key == tb.KEY_CTRL_C or ev.key == tb.KEY_CTRL_Q then break end
         on_key(ev.key, ev.ch, ev.meta)
       end
 
@@ -1279,6 +1349,6 @@ ui.EditableTextBox = EditableTextBox
 ui.List       = List
 ui.OptionList = OptionList
 ui.Menu       = Menu
-ui.AutocompleteMenu = AutocompleteMenu
+ui.SearcheableMenu = SearcheableMenu
 
 return ui

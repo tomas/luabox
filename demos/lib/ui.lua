@@ -172,6 +172,16 @@ function Box:__tostring()
   return string.format("<Box [w:%d,h:%d] [x:%d/y:%d] [fg:%d,bg:%d]>", w, h, self.x, self.y, self.width or -1, self.height or -1, self.fg or -1, self.bg or -1)
 end
 
+function Box:set_width(val)
+  self.width = val
+  self:trigger('resized')
+end
+
+function Box:set_height(val)
+  self.height = val
+  self:trigger('resized')
+end
+
 function Box:toggle(bool)
   self.changed = true
 
@@ -337,9 +347,14 @@ function Box:add(child)
   self.changed = true
 end
 
-function Box:render_tree()
-  for _, child in ipairs(self.children) do
-    child:render()
+function Box:contains(x, y)
+  local offset_x, offset_y = self:offset()
+  local width, height = self:size()
+  if (offset_x <= x and x < (offset_x + width)) and
+     (offset_y <= y and y < (offset_y + height)) then
+      return true
+  else
+    return false
   end
 end
 
@@ -365,21 +380,15 @@ function Box:render_self()
   -- width, height, offset_x, offset_y, top, right, bottom, left, center))
 end
 
-function Box:contains(x, y)
-  local offset_x, offset_y = self:offset()
-  local width, height = self:size()
-  if (offset_x <= x and x < (offset_x + width)) and
-     (offset_y <= y and y < (offset_y + height)) then
-      return true
-  else
-    return false
-  end
+function Box:rendered()
+  self.changed = false
 end
 
 function Box:render()
   -- errwrite('rendering ' .. self.id)
   if not self.hidden then
     if self.changed then
+      -- errwrite('changed! ' .. self.id)
       self:render_self()
       self:rendered()
     end
@@ -387,8 +396,10 @@ function Box:render()
   end
 end
 
-function Box:rendered()
-  self.changed = false
+function Box:render_tree()
+  for _, child in ipairs(self.children) do
+    child:render()
+  end
 end
 
 function Box:remove_tree()
@@ -1321,6 +1332,7 @@ local function start()
     elseif res == tb.EVENT_RESIZE then
       on_resize(ev.w, ev.h)
     end
+
   until stopped or res == -1
   clear_timers()
 end

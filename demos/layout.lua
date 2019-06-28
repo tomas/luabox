@@ -55,7 +55,7 @@ window:add(footer)
 -- local editor = ui.EditableTextBox("Foo bar😀 text", { left = 1, right = 1, top = 2, focus_fg = tb.rgb(0xFFCC00) })
 -- left:add(editor)
 
-local autocomplete = ui.AutocompleteMenu({ "foo", "bar", "foreman", "xxx", "yyy", "xyz" }, { hidden = false, width = 10, top = 2, height = 5, bg = tb.CYAN })
+local autocomplete = ui.SmartMenu({ "foo", "bar", "foreman", "xxx", "yyy", "xyz" }, { hidden = false, width = 10, top = 2, height = 5, bg = tb.CYAN })
 left:add(autocomplete)
 
 para:focus()

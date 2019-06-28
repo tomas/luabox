@@ -1029,12 +1029,12 @@ end
 
 -----------------------------------------
 
-local SearcheableMenu = Box:extend()
+local SmartMenu = Box:extend()
 
-function SearcheableMenu:new(items, opts)
+function SmartMenu:new(items, opts)
   local box_opts = { width = 10, top = 2, height = 1, bg = tb.CYAN }
 
-  SearcheableMenu.super.new(self, box_opts)
+  SmartMenu.super.new(self, box_opts)
   self.original_items = items
   self.selected_item = 0
   self.revealed = false
@@ -1087,7 +1087,7 @@ function SearcheableMenu:new(items, opts)
   end)
 end
 
-function SearcheableMenu:reveal(input_text)
+function SmartMenu:reveal(input_text)
   if self.revealed then return false end
   self.revealed = true
 
@@ -1098,14 +1098,14 @@ function SearcheableMenu:reveal(input_text)
   self.height = h+1
 end
 
-function SearcheableMenu:close()
+function SmartMenu:close()
   self.menu:toggle(false)
   self.input.changed = true
   self.parent.changed = true
   self.revealed = false
 end
 
-function SearcheableMenu:set_selected_item(dir)
+function SmartMenu:set_selected_item(dir)
   local w, h = self.menu:size()
   local x, y = self.menu:offset()
 
@@ -1127,7 +1127,7 @@ function SearcheableMenu:set_selected_item(dir)
   self.menu:set_selected_item(self.selected_item)
 end
 
-function SearcheableMenu:select_option(value)
+function SmartMenu:select_option(value)
   self.input:set_text(value)
   add_timer(120, function()
     self:close()
@@ -1137,12 +1137,12 @@ function SearcheableMenu:select_option(value)
   self:trigger('selected', value)
 end
 
-function SearcheableMenu:set_options(arr)
+function SmartMenu:set_options(arr)
   self.menu:set_items(arr)
   self.menu:move_to(1, 1)
 end
 
-function SearcheableMenu:filter_options(str)
+function SmartMenu:filter_options(str)
   local arr = {}
   for _, item in ipairs(self.original_items) do
     if string.find(item, str) then table.insert(arr, item) end
@@ -1151,7 +1151,7 @@ function SearcheableMenu:filter_options(str)
   self:set_options(arr)
 end
 
--- function SearcheableMenu:render_self()
+-- function SmartMenu:render_self()
 --   self.input:render_self()
 --   self.menu:render_self()
 -- end
@@ -1361,6 +1361,6 @@ ui.EditableTextBox = EditableTextBox
 ui.List       = List
 ui.OptionList = OptionList
 ui.Menu       = Menu
-ui.SearcheableMenu = SearcheableMenu
+ui.SmartMenu  = SmartMenu
 
 return ui

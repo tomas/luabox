@@ -55,6 +55,10 @@ local function add_timer(time, fn, repeating)
   return t
 end
 
+local function add_immediate_timer(fn)
+  return add_timer(0, fn)
+end
+
 local function add_repeating_timer(time, fn)
   return add_timer(time, fn, true)
 end
@@ -183,24 +187,36 @@ function Box:set_height(val)
   self:trigger('resized')
 end
 
-function Box:toggle(bool)
-  self.changed = true
-
-  if bool == true or bool == false then
-    self.hidden = not bool
-    return self.hidden
-  elseif self.hidden then
-    self.hidden = false
-    return true -- now shown
-  else
-    self.hidden = true
-    return false  -- not shown now
-  end
+function Box:set_hidden(bool)
+  self.hidden = bool
+  self:trigger(bool and 'hidden' or 'unhidden')
+  return bool
 end
 
-function Box:unfocus()
+function Box:toggle(bool)
+  self.changed = true
+  local hidden_val
+
+  if bool == true or bool == false then
+    hidden_val = not bool
+  elseif self.hidden then
+    hidden_val = false
+  else
+    hidden_val = true
+  end
+
+  self:set_hidden(hidden_val)
+  return not hidden_val -- true if now shown
+end
+
+function Box:unfocus(focus_last)
   self:trigger('unfocused')
   self.changed = true
+  window.focused = nil
+
+  if focus_last and window.last_focused then
+    window.last_focused:focus()
+  end
 end
 
 function Box:focus()
@@ -208,16 +224,16 @@ function Box:focus()
 
   -- unfocus whatever box is marked as focused
   -- store previously focused element
-  local prev_focused = window.focused
+  window.last_focused = window.focused
+
+  -- trigger unfocused for previously focused
+  if window.last_focused then window.last_focused:unfocus() end
 
   -- set current focused element to this
   window.focused = self
 
-  -- trigger unfocused for previously focused
-  if prev_focused then prev_focused:unfocus() end
-
   -- and trigger 'focused' for newly focused, passsing prev focused as param
-  self:trigger('focused', prev_focused)
+  self:trigger('focused', window.last_focused)
   self.changed = true
 end
 
@@ -329,11 +345,11 @@ function Box:size()
 end
 
 function Box:on(evt, fn)
-  self.emitter:on(evt, fn)
+  return self.emitter:on(evt, fn)
 end
 
 function Box:trigger(evt, ...)
-  self.emitter:emit(evt, ...)
+  return self.emitter:emit(evt, ...)
 end
 
 function Box:add(child)
@@ -346,6 +362,7 @@ function Box:add(child)
   table.insert(self.children, child)
   self:trigger('child_added', child)
   self.changed = true
+  return child
 end
 
 function Box:contains(x, y)
@@ -353,7 +370,7 @@ function Box:contains(x, y)
   local width, height = self:size()
   if (offset_x <= x and x < (offset_x + width)) and
      (offset_y <= y and y < (offset_y + height)) then
-      return true
+    return true
   else
     return false
   end
@@ -417,7 +434,6 @@ function Box:remove()
   self.emitter:removeAllListeners()
   self.hidden = true
 end
-
 
 ----------------------------------------
 
@@ -527,7 +543,7 @@ end
 
 function EditableTextBox:handle_key(key, meta)
   if key == tb.KEY_ENTER and meta == 0 then
-    self:append_char('\n')
+    self:handle_enter()
   elseif key == tb.KEY_BACKSPACE and meta == tb.META_ALT then
     self:delete_last_word()
   elseif key == tb.KEY_BACKSPACE2 then
@@ -590,6 +606,10 @@ end
 function EditableTextBox:move_cursor_to_next(char)
   local nextpos = string.find(self.text, char, self.cursor_pos+2)
   self.cursor_pos = (nextpos and nextpos-1) or self.chars
+end
+
+function EditableTextBox:handle_enter()
+  self:append_char('\n')
 end
 
 function EditableTextBox:set_text(text)
@@ -701,9 +721,21 @@ end
 
 function EditableTextBox:render_self()
   EditableTextBox.super.render_self(self)
-  if (self:is_focused()) then
+  if self:is_focused() then
     self:render_cursor()
   end
+end
+
+-----------------------------------------
+
+local TextInput = EditableTextBox:extend()
+
+function TextInput:new(opts)
+  TextInput.super.new(self, "", opts or {})
+end
+
+function TextInput:handle_enter()
+  self:trigger('submit', self.text)
 end
 
 -----------------------------------------
@@ -712,6 +744,7 @@ local List = Box:extend()
 
 function List:new(items, opts)
   List.super.new(self, opts or {})
+
   self.pos = 1
   self.selected = 0
   self.items = items or {}
@@ -1245,14 +1278,18 @@ end
 -----------------------------------------
 -- event handling
 
+-- we go from more specific (box, key) to less specific
 local function on_key(key, char, meta)
-  window:trigger('key', key, char, meta)
-  window:trigger('key:' .. key, key, char, meta)
-
   if window.focused then
-    window.focused:trigger('key', key, char, meta)
     window.focused:trigger('key:' .. key, key, char, meta)
   end
+
+  if window.focused then -- might have been unfocused
+    window.focused:trigger('key', key, char, meta)
+  end
+
+  window:trigger('key:' .. key, key, char, meta)
+  window:trigger('key', key, char, meta)
 end
 
 local mouse_events = {
@@ -1360,6 +1397,7 @@ ui.render = render
 
 -- timers
 ui.after  = add_timer -- ui.after(100, do_something())
+ui.next_tick = add_immediate_timer
 ui.every  = add_repeating_timer
 ui.cancel = remove_timer
 
@@ -1367,6 +1405,7 @@ ui.Box        = Box
 ui.Label      = Label
 ui.TextBox    = TextBox
 ui.EditableTextBox = EditableTextBox
+ui.TextInput = TextInput
 ui.List       = List
 ui.OptionList = OptionList
 ui.Menu       = Menu

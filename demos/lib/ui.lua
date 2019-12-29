@@ -6,6 +6,7 @@ local ustring = require('demos.lib.ustring')
 
 local screen, window, stopped
 local box_count = 0
+local stopchars = '[ /]'
 
 local function dump(o)
  if type(o) == 'table' then
@@ -539,13 +540,13 @@ function EditableTextBox:handle_key(key, meta)
     self.cursor_pos = self.chars
   elseif key == tb.KEY_ARROW_LEFT then
     if meta == tb.META_CTRL then
-      self:move_cursor_to_last(' ')
+      self:move_cursor_to_last(stopchars)
     else
       self:move_cursor(-1)
     end
   elseif key == tb.KEY_ARROW_RIGHT then
     if meta == tb.META_CTRL then
-      self:move_cursor_to_next(' ')
+      self:move_cursor_to_next(stopchars)
     else
       self:move_cursor(1)
     end
@@ -566,6 +567,14 @@ function EditableTextBox:move_cursor(dir)
   end
 
   self.cursor_pos = res
+end
+
+function EditableTextBox:move_cursor_to_beginning()
+  self.cursor_pos = res
+end
+
+function EditableTextBox:move_cursor_to_end()
+  self.cursor_pos = self.chars
 end
 
 function EditableTextBox:move_cursor_to_last(char)
@@ -618,7 +627,7 @@ end
 function EditableTextBox:delete_last_word()
   local deleting = true
   while deleting do
-    if self:delete_char(-1) == false or self:get_char_at_pos(self.cursor_pos) == " " then
+    if self:delete_char(-1) == false or string.find(self:get_char_at_pos(self.cursor_pos), stopchars) == 1 then
       deleting = false
     end
   end

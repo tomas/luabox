@@ -63,11 +63,12 @@ end
 function Events:emit(ev, ...)
     local pfx_ev = PFX .. tostring(ev)
     local evtbl = self:getEvTable(pfx_ev)
+    local last_result = nil
     if (evtbl ~= nil) then
         for _, lsn in ipairs(evtbl) do
-            local status, err = pcall(lsn, ...)
-            if err == false then break end
-            if not (status) then print(string.sub(_, PFX_LEN + 1) .. " emit error: " .. tostring(err)) end
+            local status, last_result = pcall(lsn, ...)
+            if last_result == false then break end
+            if not status then print(string.sub(_, PFX_LEN + 1) .. " emit error: " .. tostring(last_result)) end
         end
     end
 
@@ -77,14 +78,15 @@ function Events:emit(ev, ...)
 
     if (evtbl ~= nil) then
         for _, lsn in ipairs(evtbl) do
-            local status, err = pcall(lsn, ...)
-            if not (status) then print(string.sub(_, PFX_LEN + 1) .. " emit error: " .. tostring(err)) end
+            local status, last_result = pcall(lsn, ...)
+            if not status then print(string.sub(_, PFX_LEN + 1) .. " emit error: " .. tostring(last_result)) end
         end
 
         rmEntry(evtbl, function (v) return v ~= nil  end)
         self._on[pfx_ev] = nil
     end
-    return self
+
+    return last_result
 end
 
 function Events:getMaxListeners()

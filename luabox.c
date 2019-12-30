@@ -420,6 +420,7 @@ int luaopen_luabox(lua_State *L) {
   lua_pushnumber(L, TB_CYAN          ); lua_setfield(L, -2, "CYAN");
   lua_pushnumber(L, TB_LIGHT_GRAY    ); lua_setfield(L, -2, "LIGHT_GRAY");
   lua_pushnumber(L, TB_MEDIUM_GRAY   ); lua_setfield(L, -2, "MEDIUM_GRAY");
+  lua_pushnumber(L, TB_GRAY          ); lua_setfield(L, -2, "GRAY");
   lua_pushnumber(L, TB_LIGHT_RED     ); lua_setfield(L, -2, "LIGHT_RED");
   lua_pushnumber(L, TB_LIGHT_GREEN   ); lua_setfield(L, -2, "LIGHT_GREEN");
   lua_pushnumber(L, TB_LIGHT_YELLOW  ); lua_setfield(L, -2, "LIGHT_YELLOW");
@@ -440,6 +441,7 @@ int luaopen_luabox(lua_State *L) {
   lua_pushnumber(L, TB_DARKER_GREY    ); lua_setfield(L, -2, "DARKER_GREY");
   lua_pushnumber(L, TB_DARK_GREY      ); lua_setfield(L, -2, "DARK_GREY");
   lua_pushnumber(L, TB_MEDIUM_GREY    ); lua_setfield(L, -2, "MEDIUM_GREY");
+  lua_pushnumber(L, TB_GREY           ); lua_setfield(L, -2, "GREY");
   lua_pushnumber(L, TB_LIGHT_GREY     ); lua_setfield(L, -2, "LIGHT_GREY");
   lua_pushnumber(L, TB_LIGHTER_GREY   ); lua_setfield(L, -2, "LIGHTER_GREY");
   lua_pushnumber(L, TB_LIGHTEST_GREY  ); lua_setfield(L, -2, "LIGHTEST_GREY");

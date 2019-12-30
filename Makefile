@@ -1,6 +1,7 @@
 #!/usr/bin/env make -f
 
 NAME="luabox"
+# CFLAGS = -g -lm -lrt # -static
 
 # if parent dir contains a luajix dir, then use it
 ifneq ($(wildcard ../luajit),)
@@ -14,9 +15,9 @@ else
 	LUAJIT_LIB_PATH = $(shell pkg-config --libs-only-L luajit)
 endif
 
+# LUAINC = "-I/data/data/com.termux/files/usr/include/luajit-2.0"
 # LUAINC = -I/usr/local/crew/include/luajit-2.0/
 
-CFLAGS = -g -lm -lrt # -static
 DEMO_DEPS = demos/lib/ui.lua demos/lib/classic.lua demos/lib/events.lua
 
 all: luabox.a luabox.so
@@ -40,7 +41,7 @@ luabox.so: luabox.o libtermbox.a
 
 .PHONY:luabox.o
 luabox.o: termbox
-	@echo "Building layout.o"
+	@echo "Building luabox.o"
 	@$(CC) $(CFLAGS) $(LUAINC) -I termbox/src/ -c -Wall -Werror -fPIC $(NAME).c
 
 libtermbox.a: termbox

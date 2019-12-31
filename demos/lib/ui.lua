@@ -787,7 +787,16 @@ function List:new(items, opts)
   end)
 end
 
+function List:is_visible(pos)
+  local width, height = self:size()
+  return pos > self.pos and pos < self.pos + height
+end
+
 function List:move_to(pos, selected_pos)
+  if pos < 1 then
+    pos = 1
+  end
+
   self.changed = true
   self.pos = pos
   if selected_pos then

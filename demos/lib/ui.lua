@@ -1196,7 +1196,7 @@ function SmartMenu:new(items, opts)
       if not self.revealed then
         self:reveal(self.input:get_text())
       end
-      self:filter_options(self.input:get_text())
+      self:filter_options()
     end
   end)
 end
@@ -1227,13 +1227,18 @@ function SmartMenu:set_placeholder(text)
   self:mark_changed()
 end
 
-function SmartMenu:reveal(input_text)
+function SmartMenu:reset()
+  self.input:set_text('')
+  self.selected_item = 0
+  self:set_options(self.original_items)
+end
+
+function SmartMenu:reveal()
   if self.revealed then return false end
   self.revealed = true
 
   window:show_above(self.menu)
-
-  self.input:set_text('')
+  self:reset()
   self.input:focus()
 
   if self.selected_item == 0 then self:set_selected_item() end
@@ -1277,11 +1282,12 @@ function SmartMenu:set_selected_item(dir)
   self.menu:set_selected_item(self.selected_item)
 end
 
+-- TODO: optimize this
 function SmartMenu:select_option(value)
-  self.input:set_text(value)
+  -- self.input:set_text(value)
 
   add_timer(120, function()
-    self.input:set_text(value)
+    -- self.input:set_text(value)
     self.input:set_placeholder(value)
     self:close()
   end)
@@ -1296,6 +1302,8 @@ function SmartMenu:set_options(arr)
 end
 
 function SmartMenu:filter_options(str)
+  local str = str or self.input:get_text()
+
   local arr = {}
   for _, item in ipairs(self.original_items) do
     if string.find(item:lower(), str:lower()) then table.insert(arr, item) end

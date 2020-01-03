@@ -210,6 +210,8 @@ function Box:toggle(bool)
 end
 
 function Box:unfocus(focus_last)
+  if not window.focused == self then return end
+
   self:trigger('unfocused')
   self.changed = true
   window.focused = nil
@@ -306,8 +308,8 @@ function Box:margin()
     left   = (parent_w - w)/2
     right  = (parent_w - w)/2
   else
-    left   = horiz_pos == "right" and (parent_w - w) or (self.left >= 1 and self.left or parent_w * self.left)
-    right  = horiz_pos == "left" and (parent_w - w) or (self.right >= 1 and self.right or parent_w * self.right)
+    left   = horiz_pos == "right" and (parent_w - (w or 0)) or (self.left >= 1 and self.left or parent_w * self.left)
+    right  = horiz_pos == "left" and (parent_w - (w or 0)) or (self.right >= 1 and self.right or parent_w * self.right)
   end
 
   return top, right, bottom, left
@@ -396,6 +398,14 @@ function Box:render_self()
   -- local top, right, bottom, left = self:margin()
   -- tb.string(offset_x+1, offset_y, fg, bg, string.format("%dx%d @ %dx%d [%d,%d,%d,%d]",
   -- width, height, offset_x, offset_y, top, right, bottom, left, center))
+end
+
+-- marks box and children as changed so we force rerendering all
+function Box:refresh()
+  self.changed = true
+  for _, child in ipairs(self.children) do
+    child:refresh()
+  end
 end
 
 function Box:rendered()
@@ -787,7 +797,16 @@ function List:new(items, opts)
   end)
 end
 
+function List:is_visible(pos)
+  local width, height = self:size()
+  return pos > self.pos and pos < self.pos + height
+end
+
 function List:move_to(pos, selected_pos)
+  if pos < 1 then
+    pos = 1
+  end
+
   self.changed = true
   self.pos = pos
   if selected_pos then
@@ -1074,19 +1093,43 @@ end
 local SmartMenu = Box:extend()
 
 function SmartMenu:new(items, opts)
-  local box_opts = { width = 10, top = 2, height = 1, bg = tb.CYAN }
+  local default_width = 12
+
+  local box_opts = {
+    width = opts.width or default_width,
+    top = opts.top or 0,
+    height = 1,
+    horizontal_pos = opts.horizontal_pos
+  }
 
   SmartMenu.super.new(self, box_opts)
   self.original_items = items
   self.selected_item = 0
   self.revealed = false
 
-  self.placeholder = opts.placeholder or ''
-  self.input = EditableTextBox(self.placeholder, { bg = tb.WHITE, fg = tb.BLACK, height = 1 })
+  self.placeholder = opts.placeholder or ' Choose one '
+  self.input = EditableTextBox(self.placeholder, {
+    id = "smart_input",
+    bg = opts.bg or tb.WHITE,
+    fg = opts.fg or tb.BLACK,
+    height = 1,
+    -- horizontal_pos = opts.horizontal_pos
+  })
+
   self:add(self.input)
 
   local menu_height = opts.height and opts.height - 1 or nil
-  self.menu = Menu(items, { width = opts.width, height = menu_height, top = 1, bottom = 0 })
+  self.menu = Menu(items, {
+    id = "smart_menu",
+    horizontal_pos = opts.horizontal_pos,
+    width = opts.width or default_width,
+    height = menu_height,
+    -- bg = opts.bg or tb.WHITE,
+    -- fg = opts.fg or tb.BLACK,
+    top = 1,
+    bottom = 0
+  })
+
   self:add(self.menu)
 
   -- self.input:on('focused', function()
@@ -1110,7 +1153,7 @@ function SmartMenu:new(items, opts)
   self.input:on('key', function(key, ch, meta)
     if key == tb.KEY_ESC then
       self:close()
-      self.menu:focus()
+      -- self.menu:focus()
     elseif key == tb.KEY_ARROW_DOWN then
       self:reveal()
       self:set_selected_item(1)
@@ -1133,18 +1176,35 @@ function SmartMenu:reveal(input_text)
   if self.revealed then return false end
   self.revealed = true
 
-  if input_text then self.input:set_text(input_text) end
+  if input_text then
+    self.input:set_text(input_text)
+  elseif self.placeholder then
+    self.input:set_text('')
+  end
+
+  self.input:focus()
   self.menu:toggle(true)
+
   if self.selected_item == 0 then self:set_selected_item() end
   local w, h = self.menu:size()
   self.height = h+1
+
+  self:trigger('revealed')
 end
 
 function SmartMenu:close()
   self.menu:toggle(false)
-  self.input.changed = true
-  self.parent.changed = true
+
+  if self.input.text == '' and self.placeholder then
+    self.input:set_text(self.placeholder)
+  end
+
+  -- self.input.changed = true
+  -- self.parent.changed = true
+  self.parent:refresh()
+
   self.revealed = false
+  self:trigger('closed')
 end
 
 function SmartMenu:set_selected_item(dir)
@@ -1231,25 +1291,25 @@ local function load(opts)
   end
 
   window.hide_above = function(self, item)
-    if self.above_item then
-      if item and self.above_item ~= item then
-        return -- item was passed, and current above item doesn't match
-      end
+    if not self.above_item then return end
 
-      self.above_item:toggle(false)
-      if self.focused == self.above_item then
-        if self.last_focused then
-          self.last_focused:focus()
-          self.last_focused = nil
-        else
-          self.focused:unfocus()
-        end
-      end
-
-      -- self:remove(above_item)
-      self.above_item = nil
-      self:trigger('resized') -- force redraw of child elements
+    if item and self.above_item ~= item then
+      return -- item was passed, and current above item doesn't match
     end
+
+    self.above_item:toggle(false)
+    if self.focused == self.above_item then
+      if self.last_focused then
+        self.last_focused:focus()
+        self.last_focused = nil
+      else
+        self.focused:unfocus()
+      end
+    end
+
+    -- self:remove(above_item)
+    self.above_item = nil
+    self:trigger('resized') -- force redraw of child elements
   end
 
   window.toggle_above = function(self, item)

@@ -7,6 +7,7 @@ local ustring = require('demos.lib.ustring')
 local screen, window, stopped
 local box_count = 0
 local stopchars = '[ /]'
+local cursor_color = tb.RED
 
 local function dump(o)
  if type(o) == 'table' then
@@ -154,12 +155,12 @@ function Box:new(opts)
   self.children = {}
   self.emitter  = Emitter:new()
 
-  self:on('resized', function(new_w, new_h)
-    self.changed = true
-    for _, child in ipairs(self.children) do
-      child:trigger('resized', new_w, new_h)
-    end
-  end)
+  -- self:on('resized', function(new_w, new_h)
+  --   self:mark_changed()
+  --   for _, child in ipairs(self.children) do
+  --     child:trigger('resized', new_w, new_h)
+  --   end
+  -- end)
 
   -- cascade events down
   self:on('mouse_event', function(x, y, evt, ...)
@@ -193,8 +194,15 @@ function Box:set_hidden(bool)
   return bool
 end
 
-function Box:toggle(bool)
+function Box:mark_changed()
+  local was_changed = self.changed
   self.changed = true
+  self:trigger('changed')
+  return was_changed
+end
+
+function Box:toggle(bool)
+  self:mark_changed()
   local hidden_val
 
   if bool == true or bool == false then
@@ -213,7 +221,7 @@ function Box:unfocus(focus_last)
   if not window.focused == self then return end
 
   self:trigger('unfocused')
-  self.changed = true
+  self:mark_changed()
   window.focused = nil
 
   if focus_last and window.last_focused then
@@ -236,7 +244,7 @@ function Box:focus()
 
   -- and trigger 'focused' for newly focused, passsing prev focused as param
   self:trigger('focused', window.last_focused)
-  self.changed = true
+  self:mark_changed()
 end
 
 function Box:is_focused()
@@ -245,12 +253,12 @@ end
 
 function Box:set_bg(color)
   self.bg = color
-  self.changed = true
+  self:mark_changed()
 end
 
 function Box:set_fg(color)
   self.fg = color
-  self.changed = true
+  self:mark_changed()
 end
 
 function Box:colors()
@@ -300,16 +308,16 @@ function Box:margin()
     top    = (parent_h - h)/2
     bottom = (parent_h - h)/2
   else
-    top    = vert_pos == "bottom" and (parent_h - h) or (self.top >= 1 and self.top or parent_h * self.top)
-    bottom = vert_pos == "top" and (parent_h - h) or (self.bottom >= 1 and self.bottom or parent_h * self.bottom)
+    top    = vert_pos == "bottom" and (parent_h - (h or 0) - self.bottom) or (self.top >= 1 and self.top or parent_h * self.top)
+    bottom = vert_pos == "top" and (parent_h - (h or 0) - self.top) or (self.bottom >= 1 and self.bottom or parent_h * self.bottom)
   end
 
   if horiz_pos == 'center' then
     left   = (parent_w - w)/2
     right  = (parent_w - w)/2
   else
-    left   = horiz_pos == "right" and (parent_w - (w or 0)) or (self.left >= 1 and self.left or parent_w * self.left)
-    right  = horiz_pos == "left" and (parent_w - (w or 0)) or (self.right >= 1 and self.right or parent_w * self.right)
+    left   = horiz_pos == "right" and (parent_w - (w or 0) - self.right) or (self.left >= 1 and self.left or parent_w * self.left)
+    right  = horiz_pos == "left" and (parent_w - (w or 0) - self.left) or (self.right >= 1 and self.right or parent_w * self.right)
   end
 
   return top, right, bottom, left
@@ -337,9 +345,9 @@ function Box:size()
     -- debug({ "width not set", self.id, parent_w, left, right, "result => ", w })
   end
 
-  if self.height then -- width of parent
+  if self.height then -- height of parent
     h = self.height >= 1 and self.height or parent_h * self.height
-  else -- width not set. parent width minus
+  else -- height not set. parent height minus
     h = parent_h - (top + bottom)
   end
 
@@ -363,13 +371,14 @@ function Box:add(child)
   child.parent = self
   table.insert(self.children, child)
   self:trigger('child_added', child)
-  self.changed = true
+  self:mark_changed()
   return child
 end
 
 function Box:contains(x, y)
   local offset_x, offset_y = self:offset()
   local width, height = self:size()
+
   if (offset_x <= x and x < (offset_x + width)) and
      (offset_y <= y and y < (offset_y + height)) then
     return true
@@ -402,7 +411,7 @@ end
 
 -- marks box and children as changed so we force rerendering all
 function Box:refresh()
-  self.changed = true
+  self:mark_changed()
   for _, child in ipairs(self.children) do
     child:refresh()
   end
@@ -450,7 +459,9 @@ end
 local Label = Box:extend()
 
 function Label:new(text, opts)
-  Label.super.new(self, opts or {})
+  local opts = opts or {}
+  -- if not opts.width then opts.width = string.len(text) end
+  Label.super.new(self, opts)
   self.height = 1
   self.text = text
 end
@@ -461,7 +472,7 @@ end
 
 function Label:set_text(text)
   self.text = text
-  self.changed = true
+  self:mark_changed()
 end
 
 function Label:render_self()
@@ -489,7 +500,7 @@ function TextBox:new(text, opts)
 end
 
 function TextBox:set_text(text)
-  self.changed = true
+  self:mark_changed()
   self.text = text or '' -- :gsub("\n", " ")
   self.chars = ustring.len(self.text)
 end
@@ -508,7 +519,7 @@ function TextBox:render_self()
 
   width = math.floor(width)
 
-  local n, str, line, linebreak, limit = 0, self.text, nil, nil
+  local n, str, line, linebreak, limit = 0, self:get_text(), nil, nil
   while ustring.len(str) > 0 and n < height do
 
     linebreak = string.find(str, '\n')
@@ -547,7 +558,7 @@ function EditableTextBox:new(text, opts)
     else
       self:append_char(char)
     end
-    self.changed = true
+    self:mark_changed()
   end)
 end
 
@@ -726,7 +737,7 @@ function EditableTextBox:render_cursor()
     return -- don't render cursor, we're off limits
   end
 
-  tb.string(x + cursor_x, y + cursor_y, fg, tb.RED, (char == '' or char == '\n') and ' ' or char)
+  tb.string(x + cursor_x, y + cursor_y, fg, cursor_color, (char == '' or char == '\n') and ' ' or char)
 end
 
 function EditableTextBox:render_self()
@@ -742,10 +753,24 @@ local TextInput = EditableTextBox:extend()
 
 function TextInput:new(opts)
   TextInput.super.new(self, "", opts or {})
+  self.placeholder = opts.placeholder
+end
+
+function TextInput:set_placeholder(text)
+  self.placeholder = text
+  self:mark_changed()
 end
 
 function TextInput:handle_enter()
   self:trigger('submit', self.text)
+end
+
+function TextInput:get_text()
+  if self.placeholder and not self:is_focused() then
+    return self.placeholder
+  else
+    return self.text
+  end
 end
 
 -----------------------------------------
@@ -767,7 +792,7 @@ function List:new(items, opts)
   end)
 
   self:on('key', function(key, ch, meta)
-    self.changed = true
+    self:mark_changed()
     local w, h = self:size()
 
     if key == tb.KEY_ARROW_DOWN or (ch == 'j' and meta == 0) then
@@ -807,7 +832,7 @@ function List:move_to(pos, selected_pos)
     pos = 1
   end
 
-  self.changed = true
+  self:mark_changed()
   self.pos = pos
   if selected_pos then
     self:set_selected_item(selected_pos, true)
@@ -881,7 +906,7 @@ function List:set_selected_item(number, trigger_event)
     number = nitems
   end
 
-  self.changed = true
+  self:mark_changed()
   self.selected = number
   if trigger_event then
     self:trigger('selected', number, self:get_item(number))
@@ -952,7 +977,7 @@ function List:render_self()
     if diff >= 0 then -- line is shorter than width
       final = final -- .. string.rep(' ', diff)
     else -- line is longer, so cut!
-      final = ustring.sub(final, 0, rounded_width-1) .. '$'
+      final = ustring.sub(final, 0, rounded_width) .. '…'
     end
 
     self:render_item(final, x, y + line, self:item_fg_color(index, item, fg), self:item_bg_color(index, item, bg))
@@ -1096,6 +1121,7 @@ function SmartMenu:new(items, opts)
   local default_width = 12
 
   local box_opts = {
+    hidden = opts.hidden,
     width = opts.width or default_width,
     top = opts.top or 0,
     height = 1,
@@ -1103,13 +1129,13 @@ function SmartMenu:new(items, opts)
   }
 
   SmartMenu.super.new(self, box_opts)
+
   self.original_items = items
   self.selected_item = 0
   self.revealed = false
 
-  self.placeholder = opts.placeholder or ' Choose one '
-  self.input = EditableTextBox(self.placeholder, {
-    id = "smart_input",
+  self.input = TextInput({
+    placeholder = opts.placeholder or ' Choose one ',
     bg = opts.bg or tb.WHITE,
     fg = opts.fg or tb.BLACK,
     height = 1,
@@ -1120,12 +1146,12 @@ function SmartMenu:new(items, opts)
 
   local menu_height = opts.height and opts.height - 1 or nil
   self.menu = Menu(items, {
-    id = "smart_menu",
     horizontal_pos = opts.horizontal_pos,
     width = opts.width or default_width,
     height = menu_height,
-    -- bg = opts.bg or tb.WHITE,
-    -- fg = opts.fg or tb.BLACK,
+    bg = opts.menu_bg,
+    fg = opts.menu_fg,
+    selected_bg = opts.menu_selected_bg,
     top = 1,
     bottom = 0
   })
@@ -1140,14 +1166,18 @@ function SmartMenu:new(items, opts)
     self:reveal()
   end)
 
-  self.input:on('unfocused', function()
-    if not self.menu:is_focused() then
-      self:close()
-    end
+  -- hidden is triggered via window:hide_above(self.menu)
+  -- self.closed ensures the smart menu is marked as not revealed
+  self.menu:on('hidden', function()
+    self:closed()
   end)
 
   self.menu:on('submit', function(number, value)
     self:select_option(value)
+  end)
+
+  self.input:on('submit', function(value)
+    if self.revealed then self:select_option(self.menu:get_selected_item()) end
   end)
 
   self.input:on('key', function(key, ch, meta)
@@ -1160,9 +1190,8 @@ function SmartMenu:new(items, opts)
     elseif key == tb.KEY_ARROW_UP then
       self:reveal()
       self:set_selected_item(-1)
-    elseif key == tb.KEY_ENTER then
-      -- self.menu:submit()
-      if self.revealed then self:select_option(self.menu:get_selected_item()) end
+    -- elseif key == tb.KEY_ENTER then
+    --   if self.revealed then self:select_option(self.menu:get_selected_item()) end
     elseif ch then
       if not self.revealed then
         self:reveal(self.input:get_text())
@@ -1172,37 +1201,56 @@ function SmartMenu:new(items, opts)
   end)
 end
 
+function SmartMenu:size()
+  local w, h = SmartMenu.super.size(self)
+  local menu_w, menu_h = self.menu:size()
+  return w, h + menu_h
+end
+
+function SmartMenu:set_width(val)
+  SmartMenu.super.set_width(self, val)
+  self.input:set_width(val)
+  self.menu:set_width(val)
+end
+
+function SmartMenu:set_height(val)
+  self.menu:set_height(val)
+end
+
+function SmartMenu:set_items(items)
+  self.original_items = items
+  self.menu:set_items(items)
+end
+
+function SmartMenu:set_placeholder(text)
+  self.input:set_placeholder(text)
+  self:mark_changed()
+end
+
 function SmartMenu:reveal(input_text)
   if self.revealed then return false end
   self.revealed = true
 
-  if input_text then
-    self.input:set_text(input_text)
-  elseif self.placeholder then
-    self.input:set_text('')
-  end
+  window:show_above(self.menu)
 
+  self.input:set_text('')
   self.input:focus()
-  self.menu:toggle(true)
 
   if self.selected_item == 0 then self:set_selected_item() end
-  local w, h = self.menu:size()
-  self.height = h+1
+  -- local w, h = self.menu:size()
+  -- self.height = h+1
 
   self:trigger('revealed')
 end
 
 function SmartMenu:close()
-  self.menu:toggle(false)
+  if not self.revealed then return end
 
-  if self.input.text == '' and self.placeholder then
-    self.input:set_text(self.placeholder)
-  end
+  window:hide_above(self.menu)
+end
 
-  -- self.input.changed = true
-  -- self.parent.changed = true
-  self.parent:refresh()
-
+function SmartMenu:closed()
+  self.input:unfocus()
   self.revealed = false
   self:trigger('closed')
 end
@@ -1231,7 +1279,10 @@ end
 
 function SmartMenu:select_option(value)
   self.input:set_text(value)
+
   add_timer(120, function()
+    self.input:set_text(value)
+    self.input:set_placeholder(value)
     self:close()
   end)
 
@@ -1247,7 +1298,7 @@ end
 function SmartMenu:filter_options(str)
   local arr = {}
   for _, item in ipairs(self.original_items) do
-    if string.find(item, str) then table.insert(arr, item) end
+    if string.find(item:lower(), str:lower()) then table.insert(arr, item) end
   end
 
   self:set_options(arr)
@@ -1309,7 +1360,8 @@ local function load(opts)
 
     -- self:remove(above_item)
     self.above_item = nil
-    self:trigger('resized') -- force redraw of child elements
+    self:refresh() -- force redraw of child elements
+    -- self:trigger('resized') -- force redraw of child elements
   end
 
   window.toggle_above = function(self, item)
@@ -1407,6 +1459,7 @@ local function on_resize(w, h)
   -- trigger a 'resize' even on the main window
   -- this will cascade down to child elements, recursively.
   window:trigger('resized', w, h)
+  window:refresh()
 end
 
 -----------------------------------------

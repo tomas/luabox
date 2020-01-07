@@ -151,9 +151,11 @@ function Box:new(opts)
 
   self.changed  = true
   self.hidden   = opts.hidden or false
+  self.shown    = opts.hidden and false or true
   self.parent   = nil
   self.children = {}
   self.emitter  = Emitter:new()
+
 
   -- self:on('resized', function(new_w, new_h)
   --   self:mark_changed()
@@ -190,6 +192,7 @@ end
 
 function Box:set_hidden(bool)
   self.hidden = bool
+  self.shown = not bool
   self:trigger(bool and 'hidden' or 'unhidden')
   return bool
 end
@@ -245,6 +248,14 @@ function Box:focus()
   -- and trigger 'focused' for newly focused, passsing prev focused as param
   self:trigger('focused', window.last_focused)
   self:mark_changed()
+end
+
+function Box:toggle_focus()
+  if self:is_focused() then
+    self:unfocus()
+  else
+    self:focus()
+  end
 end
 
 function Box:is_focused()
@@ -551,6 +562,7 @@ local EditableTextBox = TextBox:extend()
 
 function EditableTextBox:new(text, opts)
   EditableTextBox.super.new(self, text, opts or {})
+  self.placeholder = opts.placeholder
 
   self:on('key', function(key, char, meta)
     if char == '' or meta > 2 then
@@ -560,6 +572,20 @@ function EditableTextBox:new(text, opts)
     end
     self:mark_changed()
   end)
+end
+
+function EditableTextBox:set_placeholder(text)
+  self.placeholder = text
+  self:mark_changed()
+end
+
+function EditableTextBox:get_text()
+  if self.placeholder and not self:is_focused() then
+  -- if self.placeholder and self.chars == 0 then
+    return self.placeholder
+  else
+    return self.text
+  end
 end
 
 function EditableTextBox:handle_key(key, meta)
@@ -756,21 +782,8 @@ function TextInput:new(opts)
   self.placeholder = opts.placeholder
 end
 
-function TextInput:set_placeholder(text)
-  self.placeholder = text
-  self:mark_changed()
-end
-
 function TextInput:handle_enter()
   self:trigger('submit', self.text)
-end
-
-function TextInput:get_text()
-  if self.placeholder and not self:is_focused() then
-    return self.placeholder
-  else
-    return self.text
-  end
 end
 
 -----------------------------------------
@@ -1251,6 +1264,7 @@ end
 function SmartMenu:close()
   if not self.revealed then return end
 
+  -- self:reset()
   window:hide_above(self.menu)
 end
 
@@ -1430,6 +1444,7 @@ local function on_click(key, x, y, count, is_motion)
   if window.above_item then
     if window.above_item:contains(x, y) then
       window.above_item:trigger(event, x, y)
+      window.above_item:trigger('mouse_event', x, y, event)
     else
       window:hide_above()
     end

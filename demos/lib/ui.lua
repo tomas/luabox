@@ -841,12 +841,11 @@ function List:is_visible(pos)
 end
 
 function List:move_to(pos, selected_pos)
-  if pos < 1 then
-    pos = 1
-  end
+  if pos < 1 then pos = 1 end
 
   self:mark_changed()
   self.pos = pos
+
   if selected_pos then
     self:set_selected_item(selected_pos, true)
   end
@@ -990,7 +989,7 @@ function List:render_self()
     if diff >= 0 then -- line is shorter than width
       final = final -- .. string.rep(' ', diff)
     else -- line is longer, so cut!
-      final = ustring.sub(final, 0, rounded_width) .. '…'
+      final = ustring.sub(final, 0, rounded_width-1) .. '…'
     end
 
     self:render_item(final, x, y + line, self:item_fg_color(index, item, fg), self:item_bg_color(index, item, bg))
@@ -1076,7 +1075,13 @@ local Menu = OptionList:extend()
 
 function Menu:new(items, opts)
   Menu.super.new(self, items, opts)
-  self.hidden = opts.hidden == nil and true or opts.hidden
+
+  self.min_width = opts.min_width
+  self.max_width = opts.max_width
+
+  local hidden = opts.hidden == nil and true or opts.hidden
+  self:set_hidden(hidden)
+
 
   -- selected is triggered on left click
   self:on('left_click', function(index, item)
@@ -1116,11 +1121,28 @@ function Menu:get_longest_item()
 end
 
 function Menu:size()
+  local num_items = self:num_items()
+  if num_items == 0 then
+    return 0, 0
+  end
+
   local w = self.width
-  local h = self.height or table.getn(self.items)
+  local h = self.height
+
+  if not h or h > num_items then
+    h = num_items
+  end
 
   if not w then
-    w = string.len(self:get_longest_item())
+    local item = self:get_longest_item()
+    if item then
+      w = string.len(item)
+      if self.min_width and w < self.min_width then
+        w = self.min_width
+      elseif self.max_width and w > self.max_width then
+        w = self.max_width
+      end
+    end
   end
 
   return w, h
@@ -1131,12 +1153,15 @@ end
 local SmartMenu = Box:extend()
 
 function SmartMenu:new(items, opts)
-  local default_width = 12
+  local default_placeholder = ' Choose one '
+  local width = opts.width or (string.len(opts.placeholder or default_placeholder))
 
   local box_opts = {
     hidden = opts.hidden,
-    width = opts.width or default_width,
+    width = width,
     top = opts.top or 0,
+    left = opts.left,
+    right = opts.right,
     height = 1,
     horizontal_pos = opts.horizontal_pos
   }
@@ -1148,7 +1173,7 @@ function SmartMenu:new(items, opts)
   self.revealed = false
 
   self.input = TextInput({
-    placeholder = opts.placeholder or ' Choose one ',
+    placeholder = opts.placeholder or default_placeholder,
     bg = opts.bg or tb.WHITE,
     fg = opts.fg or tb.BLACK,
     height = 1,
@@ -1160,13 +1185,13 @@ function SmartMenu:new(items, opts)
   local menu_height = opts.height and opts.height - 1 or nil
   self.menu = Menu(items, {
     horizontal_pos = opts.horizontal_pos,
-    width = opts.width or default_width,
+    min_width = width,
     height = menu_height,
-    bg = opts.menu_bg,
+    bg = opts.menu_bg or tb.LIGHT_GREY,
     fg = opts.menu_fg,
     selected_bg = opts.menu_selected_bg,
     top = 1,
-    bottom = 0
+    bottom = 0,
   })
 
   self:add(self.menu)
@@ -1313,6 +1338,13 @@ end
 function SmartMenu:set_options(arr)
   self.menu:set_items(arr)
   self.menu:move_to(1, 1)
+
+  self.parent:mark_changed()
+  self:mark_changed()
+
+  -- if table.getn(arr) == 0 then -- empty
+    -- self.parent:mark_changed()
+  -- end
 end
 
 function SmartMenu:filter_options(str)
@@ -1325,11 +1357,6 @@ function SmartMenu:filter_options(str)
 
   self:set_options(arr)
 end
-
--- function SmartMenu:render_self()
---   self.input:render_self()
---   self.menu:render_self()
--- end
 
 -----------------------------------------
 -- load/unload UI

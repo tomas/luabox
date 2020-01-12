@@ -173,6 +173,16 @@ function Box:new(opts)
       end
     end
   end)
+
+  -- lets us tell child windows to redraw based on a x/y cell coord
+  self:on('cell_changed', function(x, y)
+    for _, child in ipairs(self.children) do
+      if not child.hidden and child:contains(x, y) then
+        child:mark_changed()
+        child:trigger('cell_changed', x, y)
+      end
+    end
+  end)
 end
 
 function Box:__tostring()
@@ -973,9 +983,8 @@ function List:render_self()
   local rounded_width = width % 1 == 0 and width or math.floor(width)+1
   local index, item, formatted, diff
 
-  -- if self.title then
-  --   self.title:set_text("Width: " .. width .. ", rounded: " .. rounded_width)
-  -- end
+  -- if horizontal pos is right, then align text to the right and move X offset
+  local align_right = self.horizontal_pos == 'right'
 
   for line = 0, height - 1, 1 do
     index = line + self.pos
@@ -990,9 +999,10 @@ function List:render_self()
       final = final -- .. string.rep(' ', diff)
     else -- line is longer, so cut!
       final = ustring.sub(final, 0, rounded_width-1) .. '…'
+      diff = 0
     end
 
-    self:render_item(final, x, y + line, self:item_fg_color(index, item, fg), self:item_bg_color(index, item, bg))
+    self:render_item(final, align_right and (x + diff) or x, y + line, self:item_fg_color(index, item, fg), self:item_bg_color(index, item, bg))
   end
 end
 
@@ -1104,7 +1114,12 @@ function Menu:offset()
   if self.offset_x and self.offset_y then
     return self.offset_x, self.offset_y
   else
-    return Menu.super.offset(self)
+    local x, y = Menu.super.offset(self)
+    if self.horizontal_pos == 'right' then
+      local w, h = self:size()
+      x = x - w -- move offset position
+    end
+    return x, y
   end
 end
 
@@ -1186,6 +1201,7 @@ function SmartMenu:new(items, opts)
   self.menu = Menu(items, {
     horizontal_pos = opts.horizontal_pos,
     min_width = width,
+    max_width = width * 2,
     height = menu_height,
     bg = opts.menu_bg or tb.LIGHT_GREY,
     fg = opts.menu_fg,
@@ -1200,7 +1216,7 @@ function SmartMenu:new(items, opts)
   --   self:reveal()
   -- end)
 
-  self.input:on('click', function()
+  self.input:on('left_click', function()
     self:reveal()
   end)
 
@@ -1228,8 +1244,8 @@ function SmartMenu:new(items, opts)
     elseif key == tb.KEY_ARROW_UP then
       self:reveal()
       self:set_selected_item(-1)
-    -- elseif key == tb.KEY_ENTER then
-    --   if self.revealed then self:select_option(self.menu:get_selected_item()) end
+    elseif key == tb.KEY_TAB then -- or key == tb.KEY_ENTER then
+      if self.revealed then self:select_option(self.menu:get_selected_item()) end
     elseif ch then
       if not self.revealed then
         self:reveal(self.input:get_text())
@@ -1410,7 +1426,6 @@ local function load(opts)
     -- self:remove(above_item)
     self.above_item = nil
     self:refresh() -- force redraw of child elements
-    -- self:trigger('resized') -- force redraw of child elements
   end
 
   window.toggle_above = function(self, item)

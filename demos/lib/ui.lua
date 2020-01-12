@@ -414,7 +414,8 @@ function Box:clear()
   local fg, bg = self:colors()
 
   -- debug({ "clearing " .. self.id, offset_x, width })
-  for x = 0, math.ceil(width)-1, 1 do
+  -- for x = 0, math.ceil(width)-1, 1 do
+  for x = 0, math.floor(width), 1 do
     for y = 0, math.ceil(height)-1, 1 do
       -- self:char(x, y, self.bg_char)
       tb.char(x + offset_x, y + offset_y, fg, bg, self.bg_char)
@@ -456,7 +457,11 @@ end
 
 function Box:render_tree()
   for _, child in ipairs(self.children) do
-    child:render()
+    -- if child is current above item, skip rendering
+    -- as it will be called after all elements have been drawn
+    if window.above_item ~= child then
+      child:render()
+    end
   end
 end
 
@@ -1198,16 +1203,19 @@ function SmartMenu:new(items, opts)
   self:add(self.input)
 
   local menu_height = opts.height and opts.height - 1 or nil
+  local menu_bg = opts.menu_bg or tb.LIGHT_GREY
+
   self.menu = Menu(items, {
     horizontal_pos = opts.horizontal_pos,
     min_width = width,
     max_width = width * 2,
     height = menu_height,
-    bg = opts.menu_bg or tb.LIGHT_GREY,
+    bg = menu_bg,
     fg = opts.menu_fg,
-    selected_bg = opts.menu_selected_bg,
+    selection_fg = opts.menu_selection_fg,
+    selection_bg = opts.menu_selection_bg or menu_bg,
     top = 1,
-    bottom = 0,
+    -- bottom = 0
   })
 
   self:add(self.menu)
@@ -1264,7 +1272,7 @@ end
 function SmartMenu:set_width(val)
   SmartMenu.super.set_width(self, val)
   self.input:set_width(val)
-  self.menu:set_width(val)
+  self.menu.min_width = val
 end
 
 function SmartMenu:set_height(val)
@@ -1296,9 +1304,6 @@ function SmartMenu:reveal()
   self.input:focus()
 
   if self.selected_item == 0 then self:set_selected_item() end
-  -- local w, h = self.menu:size()
-  -- self.height = h+1
-
   self:trigger('revealed')
 end
 
@@ -1339,15 +1344,12 @@ end
 
 -- TODO: optimize this
 function SmartMenu:select_option(value)
-  -- self.input:set_text(value)
-
-  add_timer(120, function()
-    -- self.input:set_text(value)
-    self.input:set_placeholder(value)
+  self.input:set_placeholder(value)
+  add_timer(80, function()
     self:close()
   end)
 
-  self.input:focus()
+  -- self.input:focus()
   self:trigger('selected', value)
 end
 
@@ -1357,6 +1359,8 @@ function SmartMenu:set_options(arr)
 
   self.parent:mark_changed()
   self:mark_changed()
+
+  self:trigger('options_changed')
 
   -- if table.getn(arr) == 0 then -- empty
     -- self.parent:mark_changed()
@@ -1532,6 +1536,9 @@ end
 
 local function render()
   window:render()
+  if window.above_item then
+    window.above_item:render()
+  end
   tb.render()
 end
 

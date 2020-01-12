@@ -30,6 +30,10 @@ local function debug(obj)
   errwrite(dump(obj))
 end
 
+local function round(num)
+  if num >= 0 then return math.floor(num+.5)
+  else return math.ceil(num-.5) end
+end
 
 -- function num_matches(haystack, needle)
 --   local count = 0
@@ -361,14 +365,14 @@ function Box:size()
 
   if self.width then -- width of parent
     w = self.width >= 1 and self.width or parent_w * self.width
-  else -- width not set. parent width minus
+  else -- width not set. parent width minus left/right margins
     w = parent_w - (left + right)
     -- debug({ "width not set", self.id, parent_w, left, right, "result => ", w })
   end
 
   if self.height then -- height of parent
     h = self.height >= 1 and self.height or parent_h * self.height
-  else -- height not set. parent height minus
+  else -- height not set. parent height minus top/bottom margins
     h = parent_h - (top + bottom)
   end
 

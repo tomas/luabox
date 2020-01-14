@@ -1257,7 +1257,9 @@ function SmartMenu:new(items, opts)
       self:reveal()
       self:set_selected_item(-1)
     elseif key == tb.KEY_TAB then -- or key == tb.KEY_ENTER then
-      if self.revealed then self:select_option(self.menu:get_selected_item()) end
+      if self.revealed then 
+        self.input:set_text(self.menu:get_selected_item())
+      end
     elseif ch then
       if not self.revealed then
         self:reveal(self.input:get_text())

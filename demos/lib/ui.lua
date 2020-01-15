@@ -54,18 +54,30 @@ end
 
 local timers = {}
 
-local function add_timer(time, fn, repeating)
-  local t = { time = time, fn = fn, repeating = repeating and time or nil }
+-- local function find_timer_by_name(name)
+--   for idx, timer in ipairs(timers) do
+--     if timer.name and timer.name == name then
+--       return timer
+--     end
+--   end
+-- end
+
+local function add_timer(time, fn, repeating, name)
+  -- if name and find_timer_by_name(name) then
+  --   return
+  -- end
+
+  local t = { time = time, fn = fn, name = name, repeating = repeating and time or nil }
   table.insert(timers, t)
   return t
 end
 
-local function add_immediate_timer(fn)
-  return add_timer(0, fn)
+local function add_immediate_timer(fn, name)
+  return add_timer(0, fn, false, name)
 end
 
-local function add_repeating_timer(time, fn)
-  return add_timer(time, fn, true)
+local function add_repeating_timer(time, fn, name)
+  return add_timer(time, fn, true, name)
 end
 
 local function update_timers(last_time)
@@ -87,6 +99,8 @@ local function update_timers(last_time)
 
   return now
 end
+
+
 
 local function remove_timer(t)
   for idx, timer in ipairs(timers) do
@@ -493,8 +507,8 @@ function Label:new(text, opts)
   Label.super.new(self, opts)
 
   self.height = 1
-  if not opts.width then 
-    self.dynamic_width = true -- so we resize when setting a bigger text
+  if opts.width == 'auto' then 
+    self.auto_width = true -- so we resize when setting a bigger text
   end
   self:set_text(text)
 end
@@ -504,7 +518,7 @@ function Label:get_text(text)
 end
 
 function Label:set_text(text)
-  if self.dynamic_width and text then
+  if self.auto_width and text then
     self:set_width(ustring.len(text))
   end
   self.text = text
@@ -1672,13 +1686,15 @@ local function on_resize(w, h)
     tb.resize()
   end
 
-  screen.width  = w
-  screen.height = h
+  add_immediate_timer(function()
+    screen.width  = w
+    screen.height = h
 
-  -- trigger a 'resize' even on the main window
-  -- this will cascade down to child elements, recursively.
-  window:trigger('resized', w, h)
-  window:refresh()
+    -- trigger a 'resize' even on the main window
+    -- this will cascade down to child elements, recursively.
+    window:trigger('resized', w, h)
+    window:refresh()
+  end, 'resize')
 end
 
 -----------------------------------------

@@ -24,7 +24,7 @@ function init()
 
   footer = ui.Box({ height = 1, vertical_pos = "bottom", bg = tb.BLACK })
   window:add(footer)
-  footer.label = ui.Label("")
+  footer.label = ui.Label("", { width = "auto" })
   footer:add(footer.label)
 
   editor = ui.EditableTextBox("", { fg = tb.LIGHT_GREY, focus_fg = tb.WHITE, top = 2, bottom = 1 })

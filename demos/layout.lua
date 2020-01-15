@@ -61,7 +61,9 @@ left:add(autocomplete)
 local menu_right = ui.SmartMenu({ "foo", "bar", "A long option", "Another long one", "yyy", "xyz" }, { id = "menu2", placeholder = " Choose ", horizontal_pos = "right", top = 4, right = 2, height = 5, bg = tb.CYAN })
 left:add(menu_right)
 
+local input = ui.TextInput({ top = 5, left = 3, width = 5, bg = tb.GREY, focus_fg = tb.WHITE })
+left:add(input)
 
-para:focus()
+-- para:focus()
 ui.start()
 ui.unload()

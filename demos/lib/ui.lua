@@ -490,10 +490,13 @@ local Label = Box:extend()
 
 function Label:new(text, opts)
   local opts = opts or {}
-  -- if not opts.width then opts.width = string.len(text) end
   Label.super.new(self, opts)
+
   self.height = 1
-  self.text = text
+  if not opts.width then 
+    self.dynamic_width = true -- so we resize when setting a bigger text
+  end
+  self:set_text(text)
 end
 
 function Label:get_text(text)
@@ -501,6 +504,9 @@ function Label:get_text(text)
 end
 
 function Label:set_text(text)
+  if self.dynamic_width and text then
+    self:set_width(ustring.len(text))
+  end
   self.text = text
   self:mark_changed()
 end
@@ -511,6 +517,7 @@ function Label:render_self()
   local x, y = self:offset()
   local fg, bg = self:colors()
   local width, height = self:size()
+  if width == 0 or height == 0 then return end
 
   local str = ustring.sub(self.text, 0, math.floor(width))
   tb.string(x, y, fg, bg, str)
@@ -527,30 +534,85 @@ function TextBox:new(text, opts)
   self:on('left_click', function(mouse_x, mouse_y)
     self:focus()
   end)
+
+  self:on('scroll_up', function(mouse_x, mouse_y)
+    self:scroll_up()
+  end)
+
+  self:on('scroll_down', function(mouse_x, mouse_y)
+    self:scroll_down()
+  end)
 end
 
 function TextBox:set_text(text)
   self:mark_changed()
   self.text = text or '' -- :gsub("\n", " ")
   self.chars = ustring.len(self.text)
+  self.xpos = 0
+  self.ypos = 0
 end
 
 function TextBox:get_text()
   return self.text
 end
 
+function TextBox:scroll_up()
+  -- TODO
+end
+
+function TextBox:scroll_down()
+  -- TODO
+end
+
+function TextBox:move_to(ypos)
+  if ypos < 0 then ypos = 0 end
+
+  self:mark_changed()
+  self.ypos = ypos
+end
+
+function TextBox:move(dir)
+  local result = math.floor(dir) + self.ypos
+  local width, height = self:size()
+
+  -- ensure we stay within bounds
+  if result < 0 then
+    return self:move_to(0)
+  -- and that the don't show an empty box
+  elseif dir > 0 and (self.nlines > 0 and result > (self.nlines - height + dir)) then
+    return
+  end
+
+  self:move_to(result)
+end
+
+function TextBox:get_xpos()
+  return self.xpos
+end
+
+function TextBox:get_ypos()
+  return self.ypos
+end
+
+function TextBox:render_line(x, y, fg, bg, line)
+  tb.string(x, y, fg, bg, line)
+end
+
 function TextBox:render_self()
   -- TextBox.super.clear(self)
   self:clear()
 
+  local xpos = self:get_xpos()
+  local ypos = self:get_ypos()
   local x, y = self:offset()
   local fg, bg = self:colors()
   local width, height = self:size()
-
   width = math.floor(width)
 
-  local n, str, line, linebreak, limit = 0, self:get_text(), nil, nil
-  while ustring.len(str) > 0 and n < height do
+  local nlines = 1
+  local str, line, linebreak, limit, line_num = self:get_text()
+  for line_num = 0, (height+ypos) - 1, 1 do
+    if ustring.len(str) <= 0 then break end
 
     linebreak = string.find(str, '\n')
     if linebreak and linebreak <= width then
@@ -561,20 +623,23 @@ function TextBox:render_self()
       local diff = width - ustring.len(str)
 
       if diff > 0 then -- yep, this is the last line
-        line = str -- .. string.rep(' ', diff) -- fill with empty spaces
+        line = str
       else
-        line = ustring.sub(str, 0, width)
+        line = ustring.sub(str, 0, round(width))
       end
 
       limit = width + 1
     end
 
-    tb.string(x, y + n, fg, bg, line)
-    n = n + 1
+    if line_num >= ypos then
+      self:render_line(x, y + line_num - ypos, fg, bg, line)
+    end
+
     str = ustring.sub(str, limit)
+    nlines = nlines + 1
   end
 
-  self.lines = n
+  self.nlines = nlines
 end
 
 local EditableTextBox = TextBox:extend()
@@ -616,28 +681,30 @@ function EditableTextBox:handle_key(key, meta)
     self:delete_char(-1)
   elseif key == tb.KEY_DELETE then
     self:delete_char(0)
-  elseif key == tb.KEY_HOME or (key == tb.KEY_CTRL_A and meta == tb.META_CTRL) then
+  elseif key == tb.KEY_HOME then
+    self:move_cursor_to_last('\n')
+  elseif (key == tb.KEY_CTRL_A and meta == tb.META_CTRL) then
     self.cursor_pos = 0
-  elseif key == tb.KEY_END or (key == tb.KEY_CTRL_E and meta == tb.META_CTRL) then
+  elseif key == tb.KEY_END then
+    self:move_cursor_to_next('\n')
+  elseif (key == tb.KEY_CTRL_E and meta == tb.META_CTRL) then
     self.cursor_pos = self.chars
   elseif key == tb.KEY_ARROW_LEFT then
     if meta == tb.META_CTRL then
       self:move_cursor_to_last(stopchars)
     else
-      self:move_cursor(-1)
+      self:move_cursor_left()
     end
   elseif key == tb.KEY_ARROW_RIGHT then
     if meta == tb.META_CTRL then
       self:move_cursor_to_next(stopchars)
     else
-      self:move_cursor(1)
+      self:move_cursor_right()
     end
   elseif key == tb.KEY_ARROW_DOWN then
-    local width, height = self:size()
-    self:move_cursor(math.floor(width))
+    self:move_cursor_down()
   elseif key == tb.KEY_ARROW_UP then
-    local width, height = self:size()
-    self:move_cursor(math.floor(width) * -1)
+    self:move_cursor_up()
   end
 end
 
@@ -651,8 +718,56 @@ function EditableTextBox:move_cursor(dir)
   self.cursor_pos = res
 end
 
+function EditableTextBox:move_cursor_left()
+  return self:move_cursor(-1)
+end
+
+function EditableTextBox:move_cursor_right()
+  return self:move_cursor(1)
+end
+
+function EditableTextBox:maybe_move_cursor_up()
+  local cursor_x, cursor_y = self:get_cursor_offset()
+  if cursor_y == 0 and self.ypos > 0 then
+    self:move(-1)
+    return
+  end
+end
+
+function EditableTextBox:move_cursor_up()
+  if self:maybe_move_cursor_up() then
+    return true
+  end
+
+  local width, height = self:size()
+  if not self:move_cursor(math.floor(width) * -1) then
+    self:move_cursor_to_last('\n')
+  end
+end
+
+function EditableTextBox:maybe_move_cursor_down()
+  local width, height = self:size()
+
+  local cursor_x, cursor_y = self:get_cursor_offset()
+  if cursor_y >= height and self.nlines >= height then
+    self:move(1)
+    return true
+  end
+end
+
+function EditableTextBox:move_cursor_down()
+  if self:maybe_move_cursor_down() then
+    return true
+  end
+
+  local width, height = self:size()
+  if not self:move_cursor(math.floor(width)) then
+    self:move_cursor_to_next('\n')
+  end
+end
+
 function EditableTextBox:move_cursor_to_beginning()
-  self.cursor_pos = res
+  self.cursor_pos = 0
 end
 
 function EditableTextBox:move_cursor_to_end()
@@ -665,17 +780,19 @@ function EditableTextBox:move_cursor_to_last(char)
   if lastpos and lastpos - reverse_cursor_pos > 0 then
     self:move_cursor(-(lastpos - reverse_cursor_pos - 1))
   else
-    self.cursor_pos = 0
+    self:move_cursor_to_beginning()
   end
 end
 
-function EditableTextBox:move_cursor_to_next(char)
+function EditableTextBox:move_cursor_to_next(char, insert_after)
   local nextpos = string.find(self.text, char, self.cursor_pos+2)
-  self.cursor_pos = (nextpos and nextpos-1) or self.chars
+  local offset = insert_after and 0 or -1
+  self.cursor_pos = nextpos and (nextpos + offset) or self.chars
 end
 
 function EditableTextBox:handle_enter()
   self:append_char('\n')
+  self:maybe_move_cursor_down()
 end
 
 function EditableTextBox:set_text(text)
@@ -691,7 +808,7 @@ function EditableTextBox:append_char(char)
   end
 
   self.chars = self.chars + 1
-  self.cursor_pos = self.cursor_pos + 1
+  self:move_cursor(1)
 end
 
 function EditableTextBox:delete_char(at)
@@ -706,7 +823,9 @@ function EditableTextBox:delete_char(at)
   end
 
   self.chars = self.chars - 1
-  self.cursor_pos = self.cursor_pos + at
+  self:move_cursor(at)
+  self:maybe_move_cursor_up()
+
   return true
 end
 
@@ -720,8 +839,13 @@ function EditableTextBox:delete_last_word()
 end
 
 function EditableTextBox:get_cursor_offset(width)
+  if not width then
+    local w, h = self:size()
+    width = round(w)
+  end
+
   local pos = self.cursor_pos
-  local str = ustring.sub(self.text, 0, self.cursor_pos)
+  local str = ustring.sub(self.text, 0, pos)
 
   if pos < width and not contains_newline(str, width-1) then
     return pos, 0
@@ -729,7 +853,7 @@ function EditableTextBox:get_cursor_offset(width)
 
   local x, y, line = 0, 0, nil
   local n, chars, limit, nextbreak = 0, 0, 0
-  while string.len(str) > 0 do
+  while ustring.len(str) > 0 do
 
     nextbreak = string.find(str, '\n')
     if nextbreak and nextbreak <= width then
@@ -763,7 +887,7 @@ function EditableTextBox:get_cursor_offset(width)
     end
   end
 
-  return x, y
+  return x, (y - self:get_ypos())
 end
 
 function EditableTextBox:get_char_at_pos(pos)
@@ -797,15 +921,33 @@ end
 local TextInput = EditableTextBox:extend()
 
 function TextInput:new(opts)
-  local opts = opts or {}
-  opts.height = 1
   TextInput.super.new(self, "", opts)
+  self.height = 1
   self.placeholder = opts.placeholder
 end
 
 function TextInput:handle_enter()
   self:trigger('submit', self.text)
 end
+
+function TextInput:move_cursor(dir)
+  local w, h = self:size()
+  if dir > 0 and self.chars > w then
+    self.xpos = self.chars - w
+  elseif dir < 0 and self.xpos > 0 then
+    self.xpos = self.chars - w
+  else
+    TextInput.super.move_cursor(self, dir)
+  end
+end
+
+-- function TextInput:move_cursor_left()
+--   return self:move_cursor(-1)
+-- end
+
+-- function TextInput:move_cursor_right()
+--   return self:move_cursor(1)
+-- end
 
 -----------------------------------------
 
@@ -814,7 +956,7 @@ local List = Box:extend()
 function List:new(items, opts)
   List.super.new(self, opts or {})
 
-  self.pos = 1
+  self.ypos = 1
   self.selected = 0
   self.items = items or {}
 
@@ -856,16 +998,16 @@ function List:new(items, opts)
   end)
 end
 
-function List:is_visible(pos)
+function List:is_visible(ypos)
   local width, height = self:size()
-  return pos > self.pos and pos < self.pos + height
+  return ypos > self.ypos and ypos < self.ypos + height
 end
 
-function List:move_to(pos, selected_pos)
-  if pos < 1 then pos = 1 end
+function List:move_to(ypos, selected_pos)
+  if ypos < 1 then ypos = 1 end
 
   self:mark_changed()
-  self.pos = pos
+  self.ypos = ypos
 
   if selected_pos then
     self:set_selected_item(selected_pos, true)
@@ -873,7 +1015,7 @@ function List:move_to(pos, selected_pos)
 end
 
 function List:move(dir)
-  local result = math.floor(dir) + self.pos
+  local result = math.floor(dir) + self.ypos
   local width, height = self:size()
   local nitems = self:num_items()
 
@@ -919,7 +1061,7 @@ end
 
 function List:set_items(arr)
   self.items = arr
-  self.pos = 1
+  self.ypos = 1
   self:set_selected_item(0, false)
 end
 
@@ -998,7 +1140,7 @@ function List:render_self()
   local align_right = self.horizontal_pos == 'right'
 
   for line = 0, height - 1, 1 do
-    index = line + self.pos
+    index = line + self.ypos
     item = self:get_item(index)
     if not item then break end
 
@@ -1032,7 +1174,7 @@ function OptionList:new(items, opts)
 
   self:on('left_click', function(mouse_x, mouse_y)
     local x, y = self:offset()
-    self:select(self.pos + (mouse_y - y))
+    self:select(self.ypos + (mouse_y - y))
   end)
 
   self:on('double_click', function(mouse_x, mouse_y)
@@ -1053,7 +1195,7 @@ function OptionList:move(dir)
   local width, height = self:size()
 
   -- if new_selected is above position or below position + height, then also move
-  if new_selected < self.pos or (new_selected >= self.pos + height) then
+  if new_selected < self.ypos or (new_selected >= self.ypos + height) then
     OptionList.super.move(self, dir)
   end
 

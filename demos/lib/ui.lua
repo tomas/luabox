@@ -426,18 +426,23 @@ function Box:contains(x, y)
   end
 end
 
+function Box:clear_line(x, y, fg, bg, char, width)
+  tb.string(x, y, fg, bg, string.rep(char, width))
+end
+
 function Box:clear()
   local offset_x, offset_y = self:offset()
   local width, height = self:size()
   local fg, bg = self:colors()
+  local rounded_width = math.ceil(width)
 
   -- debug({ "clearing " .. self.id, offset_x, width })
-  -- for x = 0, math.ceil(width)-1, 1 do
-  for x = 0, math.floor(width), 1 do
-    for y = 0, math.ceil(height)-1, 1 do
-      -- self:char(x, y, self.bg_char)
-      tb.char(x + offset_x, y + offset_y, fg, bg, self.bg_char)
-    end
+  for y = 0, math.ceil(height)-1, 1 do
+    self:clear_line(offset_x, y + offset_y, fg, bg, self.bg_char, rounded_width)
+
+    -- for x = 0, math.floor(width), 1 do
+    --   tb.char(x + offset_x, y + offset_y, fg, bg, self.bg_char)
+    -- end
   end
 end
 

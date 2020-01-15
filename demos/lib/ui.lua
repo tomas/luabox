@@ -982,6 +982,9 @@ function List:new(items, opts)
   self.selection_fg = opts.selection_fg
   self.selection_bg = opts.selection_bg or tb.BLACK
 
+  self.changed_line_from = nil
+  self.changed_line_to = nil
+
   self:on('left_click', function(mouse_x, mouse_y)
     self:focus()
   end)
@@ -1025,6 +1028,8 @@ end
 function List:move_to(ypos, selected_pos)
   if ypos < 1 then ypos = 1 end
 
+  -- make sure to mark changed before calling set_selected_item
+  -- so we don't just mark the specific changed lines
   self:mark_changed()
   self.ypos = ypos
 
@@ -1100,8 +1105,17 @@ function List:set_selected_item(number, trigger_event)
     number = nitems
   end
 
+  if number and not self.changed then
+    self.changed_line_from = self.selected
+    self.changed_line_to = number
+  else
+    self.changed_line_from = nil
+    self.changed_line_to = nil
+  end
+
   self:mark_changed()
   self.selected = number
+
   if trigger_event then
     self:trigger('selected', number, self:get_item(number))
   end
@@ -1147,35 +1161,53 @@ function List:render_item(formatted, x, y, fg, bg)
 end
 
 function List:render_self()
-  self:clear()
+  if not self.changed_line_from then
+    self:clear()
+  end
 
   local x, y = self:offset()
   local width, height = self:size()
   local fg, bg = self:colors()
   local rounded_width = width % 1 == 0 and width or math.floor(width)+1
-  local index, item, formatted, diff
+  local index, item, formatted, diff, skip_render
 
   -- if horizontal pos is right, then align text to the right and move X offset
   local align_right = self.horizontal_pos == 'right'
 
-  for line = 0, height - 1, 1 do
+  for line = 0, height - 1, 1 do   
     index = line + self.ypos
-    item = self:get_item(index)
-    if not item then break end
+    skip_render = false
 
-    formatted = self:format_item(item)
-    final     = self:fix_encoding(formatted)
-    diff      = width - ustring.len(final)
-
-    if diff >= 0 then -- line is shorter than width
-      final = final -- .. string.rep(' ', diff)
-    else -- line is longer, so cut!
-      final = ustring.sub(final, 0, rounded_width-1) .. '…'
-      diff = 0
+    if self.changed_line_from and self.changed_line_to then --
+      if index == self.changed_line_from or index == self.changed_line_to then
+        self:clear_line(x, y + line, fg, bg, self.bg_char, width)
+      else
+        -- not one of the changed lines, so skip
+        skip_render = true
+      end
     end
 
-    self:render_item(final, align_right and (x + diff) or x, y + line, self:item_fg_color(index, item, fg), self:item_bg_color(index, item, bg))
+    if not skip_render then
+      item = self:get_item(index)
+      if not item then break end
+
+      formatted = self:format_item(item)
+      final     = self:fix_encoding(formatted)
+      diff      = width - ustring.len(final)
+
+      if diff >= 0 then -- line is shorter than width
+        final = final -- .. string.rep(' ', diff)
+      else -- line is longer, so cut!
+        final = ustring.sub(final, 0, rounded_width-1) .. '…'
+        diff = 0
+      end
+
+      self:render_item(final, align_right and (x + diff) or x, y + line, self:item_fg_color(index, item, fg), self:item_bg_color(index, item, bg))
+    end
   end
+
+  self.changed_line_from = nil
+  self.changed_line_to = nil
 end
 
 -----------------------------------------

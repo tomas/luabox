@@ -797,7 +797,9 @@ end
 local TextInput = EditableTextBox:extend()
 
 function TextInput:new(opts)
-  TextInput.super.new(self, "", opts or {})
+  local opts = opts or {}
+  opts.height = 1
+  TextInput.super.new(self, "", opts)
   self.placeholder = opts.placeholder
 end
 

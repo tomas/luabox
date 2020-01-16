@@ -549,6 +549,7 @@ local TextBox = Box:extend()
 function TextBox:new(text, opts)
   TextBox.super.new(self, opts or {})
   self:set_text(text)
+  self.nlines = -1 -- unknown
 
   self:on('left_click', function(mouse_x, mouse_y)
     self:focus()
@@ -768,6 +769,7 @@ function EditableTextBox:maybe_move_cursor_down()
   local width, height = self:size()
 
   local cursor_x, cursor_y = self:get_cursor_offset()
+
   if cursor_y >= height and self.nlines >= height then
     self:move(1)
     return true
@@ -1025,13 +1027,22 @@ function List:is_visible(ypos)
   return ypos > self.ypos and ypos < self.ypos + height
 end
 
+function List:set_ypos(ypos)
+  -- self:mark_changed()
+  self.ypos = ypos
+end
+
 function List:move_to(ypos, selected_pos)
   if ypos < 1 then ypos = 1 end
+
+  -- ensure we trigger a full refresh on next render loop
+  self.changed_line_from = nil
+  self.changed_line_to = nil
 
   -- make sure to mark changed before calling set_selected_item
   -- so we don't just mark the specific changed lines
   self:mark_changed()
-  self.ypos = ypos
+  self:set_ypos(ypos)
 
   if selected_pos then
     self:set_selected_item(selected_pos, true)
@@ -1085,7 +1096,8 @@ end
 
 function List:set_items(arr)
   self.items = arr
-  self.ypos = 1
+  self:mark_changed()
+  self:set_ypos(1)
   self:set_selected_item(0, false)
 end
 
@@ -1174,7 +1186,7 @@ function List:render_self()
   -- if horizontal pos is right, then align text to the right and move X offset
   local align_right = self.horizontal_pos == 'right'
 
-  for line = 0, height - 1, 1 do   
+  for line = 0, math.ceil(height)-1, 1 do   
     index = line + self.ypos
     skip_render = false
 
@@ -1402,7 +1414,7 @@ function SmartMenu:new(items, opts)
   self:add(self.input)
 
   local menu_height = opts.height and opts.height - 1 or nil
-  local menu_bg = opts.menu_bg or tb.LIGHT_GREY
+  local menu_bg = opts.menu_bg or tb.GREY
 
   self.menu = Menu(items, {
     horizontal_pos = opts.horizontal_pos,
@@ -1518,6 +1530,7 @@ end
 function SmartMenu:closed()
   self.input:unfocus()
   self.revealed = false
+  self:set_hidden(true)
   self:trigger('closed')
 end
 
@@ -1531,7 +1544,7 @@ function SmartMenu:set_selected_item(dir)
 
     if res > h then
       self.menu:move(1)
-    elseif res < y then
+    elseif res < h then
       self.menu:move(-1)
     end
 

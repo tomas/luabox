@@ -1511,6 +1511,7 @@ end
 function SmartMenu:reveal()
   if self.revealed then return false end
   self.revealed = true
+  self:set_hidden(false)
 
   window:show_above(self.menu)
   self:reset()

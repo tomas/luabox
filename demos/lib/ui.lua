@@ -993,7 +993,7 @@ function List:new(items, opts)
   end)
 
   self:on('key', function(key, ch, meta)
-    self:mark_changed()
+    -- self:mark_changed()
     local w, h = self:size()
 
     if key == tb.KEY_ARROW_DOWN or (ch == 'j' and meta == 0) then
@@ -1034,6 +1034,9 @@ function List:set_ypos(ypos)
 end
 
 function List:move_to(ypos, selected_pos)
+  -- if ypos > self:num_items() then 
+  --   ypos = self:num_items()
+  -- end
   if ypos < 1 then ypos = 1 end
 
   -- ensure we trigger a full refresh on next render loop
@@ -1084,11 +1087,7 @@ function List:move_page(dir, height)
 end
 
 function List:num_items()
-  if not self.items then
-    return -1
-  end
-
-  return table.getn(self.items)
+  return self.nitems
 end
 
 function List:clear_items()

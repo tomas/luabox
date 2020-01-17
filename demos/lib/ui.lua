@@ -8,6 +8,7 @@ local screen, window, stopped
 local box_count = 0
 local stopchars = '[ /]'
 local cursor_color = tb.RED
+local page_move_ratio = 1.3
 
 local function dump(o)
  if type(o) == 'table' then
@@ -1086,7 +1087,7 @@ function List:page_down(height)
 end
 
 function List:move_page(dir, height)
-  local lines = math.floor(height/1.3) * dir
+  local lines = math.floor(height/page_move_ratio) * dir
   local cur = self.selected
   self:move(lines)
 
@@ -1121,7 +1122,12 @@ end
 
 function List:set_item(number, item)
   self.items[number] = item
-  -- self:set_selected_item(0, false)
+  -- we might be adding a new item, so recalc
+  self.nitems = table.getn(self.items)
+end
+
+function List:add_item(item)
+  self:set_item(self.nitems + 1, item)
 end
 
 function List:get_item(number)

@@ -1094,8 +1094,9 @@ function List:clear_items()
   self:set_items({})
 end
 
-function List:set_items(arr)
+function List:set_items(arr, keep_position)
   self.items = arr
+  self.nitems = table.getn(self.items)
   self:mark_changed()
   if reset_position then
     self:set_ypos(1)
@@ -1112,7 +1113,7 @@ end
 
 function List:set_item(number, item)
   self.items[number] = item
-  self:set_selected_item(0, false)
+  -- self:set_selected_item(0, false)
 end
 
 function List:get_item(number)
@@ -1316,7 +1317,6 @@ function Menu:new(items, opts)
 
   local hidden = opts.hidden == nil and true or opts.hidden
   self:set_hidden(hidden)
-
 
   -- selected is triggered on left click
   self:on('left_click', function(index, item)

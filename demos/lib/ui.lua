@@ -35,7 +35,14 @@ local function round(num)
   else return math.ceil(num-.5) end
 end
 
--- function num_matches(haystack, needle)
+local function merge_table(a, b)
+  for key, val in pairs(b) do
+    a[key] = val
+  end
+  return a
+end
+
+-- local function num_matches(haystack, needle)
 --   local count = 0
 --   for i in string.gfind(haystack, needle) do
 --      count = count + 1
@@ -43,11 +50,10 @@ end
 --   return count
 -- end
 
-function contains_newline(str, stop)
+local function contains_newline(str, stop)
   local subs = str:sub(0, stop)
   return subs:find('\n')
 end
-
 
 -----------------------------------------
 -- timers
@@ -99,8 +105,6 @@ local function update_timers(last_time)
 
   return now
 end
-
-
 
 local function remove_timer(t)
   for idx, timer in ipairs(timers) do
@@ -185,7 +189,7 @@ function Box:new(opts)
   -- cascade events down
   self:on('mouse_event', function(x, y, evt, ...)
     for _, child in ipairs(self.children) do
-      if not child.hidden and child:contains(x, y) then
+      if child.shown and child:contains(x, y) then
         child:trigger('mouse_event', x, y, evt, ...)
         child:trigger(evt, x, y, ...)
       end
@@ -195,7 +199,7 @@ function Box:new(opts)
   -- lets us tell child windows to redraw based on a x/y cell coord
   self:on('cell_changed', function(x, y)
     for _, child in ipairs(self.children) do
-      if not child.hidden and child:contains(x, y) then
+      if child.shown and child:contains(x, y) then
         child:mark_changed()
         child:trigger('cell_changed', x, y)
       end
@@ -397,6 +401,10 @@ function Box:on(evt, fn)
   return self.emitter:on(evt, fn)
 end
 
+function Box:once(evt, fn)
+  return self.emitter:once(evt, fn)
+end
+
 function Box:trigger(evt, ...)
   return self.emitter:emit(evt, ...)
 end
@@ -512,7 +520,7 @@ function Label:new(text, opts)
   Label.super.new(self, opts)
 
   self.height = 1
-  if opts.width == 'auto' then 
+  if opts.width == 'auto' then
     self.auto_width = true -- so we resize when setting a bigger text
   end
   self:set_text(text)
@@ -1196,7 +1204,7 @@ function List:render_self()
   -- if horizontal pos is right, then align text to the right and move X offset
   local align_right = self.horizontal_pos == 'right'
 
-  for line = 0, math.ceil(height)-1, 1 do   
+  for line = 0, math.ceil(height)-1, 1 do
     index = line + self.ypos
     skip_render = false
 
@@ -1473,7 +1481,7 @@ function SmartMenu:new(items, opts)
       self:reveal()
       self:set_selected_item(-1)
     elseif key == tb.KEY_TAB then -- or key == tb.KEY_ENTER then
-      if self.revealed then 
+      if self.revealed then
         self.input:set_text(self.menu:get_selected_item())
       end
     elseif ch then
@@ -1623,9 +1631,17 @@ local function load(opts)
 
   window.show_above = function(self, item)
     if self.above_item then
+      if self.above_item == item then return end
       self:hide_above()
     end
-    -- self:add(item)
+
+    if not item.parent then
+      self:add(item)
+      item:once('hidden', function()
+        item:remove()
+      end)
+    end
+
     self.above_item = item
     self.last_focused = self.focused
     item:toggle(true)
@@ -1664,6 +1680,65 @@ local function load(opts)
     end
   end
 
+  window.alert = function(self, msg, opts, cb)
+    if type(opts) == 'function' then
+      cb = opts
+      opts = {}
+    else
+      if opts == nil then opts = {} end
+    end
+    opts.skip_confirm = true
+    self:confirm(msg, opts, cb)
+  end
+
+  window.confirm = function(self, msg, opts, cb)
+    if type(opts) == 'function' then
+      cb = opts
+      opts = {}
+    else
+      if opts == nil then opts = {} end
+    end
+
+    local box = Box(merge_table(opts, { hidden = true, bg = tb.LIGHT_GREY, horizontal_pos = "center", vertical_pos = "center", height = 4, width = 0.3 }))
+    local label = Label(msg, { left = 2, right = 2, top = 1 })
+    box:add(label)
+
+    -- buttons
+    local accepted = false
+    local button_opts = { bg = tb.DARK_GREY, fg = tb.WHITE, vertical_pos = "bottom", bottom = 0 }
+
+    if opts.skip_confirm then
+      button_opts.right = 1
+    else
+      button_opts.width = 0.4
+    end
+
+    local accept = Label(opts.skip_confirm and ' OK ' or ' Yes ', merge_table(button_opts, { width = 5, left = 2 }))
+    box:add(accept)
+
+    accept:once('left_click', function()
+      accepted = true
+      self:hide_above(box)
+    end)
+
+    if not opts.skip_confirm then
+      -- local cancel = Label(' No ', merge_table(button_opts, { horizontal_pos = "right", width = 4, right = 2 }))
+      local cancel = Label(' No ', merge_table(button_opts, { width = 4, left = 8 }))
+      box:add(cancel)
+
+      cancel:once('left_click', function()
+        window:hide_above(box)
+      end)
+    end
+
+    self:show_above(box)
+    if not cb then return end
+
+    box:once('hidden', function()
+      cb(accepted)
+    end)
+  end
+
   window.parent = screen
   return window
 end
@@ -1686,7 +1761,7 @@ local function on_key(key, char, meta)
     window.focused:trigger('key:' .. key, key, char, meta)
   end
 
-  if window.focused then -- might have been unfocused
+  if window.focused then -- might have been unfocused by previous call
     window.focused:trigger('key', key, char, meta)
   end
 
@@ -1722,7 +1797,7 @@ local function on_click(key, x, y, count, is_motion)
   window:trigger('mouse_event', x, y, event, is_motion)
 
   if event:match('_click') then
-    -- trigger a 'click' event for all mouse clicks
+    -- trigger a 'click' event for all mouse clicks, regardless of button
     window:trigger('mouse_event', x, y, 'click')
 
     if count > 0 and count % 2 == 0 then -- four clicks in a row should count as 2 x double-click

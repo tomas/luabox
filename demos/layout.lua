@@ -3,9 +3,7 @@ local tb = require('luabox')
 
 -----------------------------------------
 
-local window = ui.load()
-
-tb.enable_mouse()
+local window = ui.load({ mouse = true })
 
 -- create a 10x10 rectangle at coordinates 5x5
 if not window then
@@ -63,6 +61,18 @@ left:add(menu_right)
 
 local input = ui.TextInput({ top = 5, left = 3, width = 5, bg = tb.GREY, focus_fg = tb.WHITE })
 left:add(input)
+
+window:on('key', function(key, ch, meta)
+  if key == tb.KEY_CTRL_A then
+    window:alert('Hello!')
+  end
+
+  if key == tb.KEY_CTRL_B then
+    window:confirm('Are you sure', function(accepted)
+      print(accepted)
+    end)
+  end
+end)
 
 -- para:focus()
 ui.start()

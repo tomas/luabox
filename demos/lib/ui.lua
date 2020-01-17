@@ -189,7 +189,7 @@ function Box:new(opts)
   -- cascade events down
   self:on('mouse_event', function(x, y, evt, ...)
     for _, child in ipairs(self.children) do
-      if not child.hidden and child:contains(x, y) then
+      if child.shown and child:contains(x, y) then
         child:trigger('mouse_event', x, y, evt, ...)
         child:trigger(evt, x, y, ...)
       end
@@ -199,7 +199,7 @@ function Box:new(opts)
   -- lets us tell child windows to redraw based on a x/y cell coord
   self:on('cell_changed', function(x, y)
     for _, child in ipairs(self.children) do
-      if not child.hidden and child:contains(x, y) then
+      if child.shown and child:contains(x, y) then
         child:mark_changed()
         child:trigger('cell_changed', x, y)
       end
@@ -520,7 +520,7 @@ function Label:new(text, opts)
   Label.super.new(self, opts)
 
   self.height = 1
-  if opts.width == 'auto' then 
+  if opts.width == 'auto' then
     self.auto_width = true -- so we resize when setting a bigger text
   end
   self:set_text(text)
@@ -1194,7 +1194,7 @@ function List:render_self()
   -- if horizontal pos is right, then align text to the right and move X offset
   local align_right = self.horizontal_pos == 'right'
 
-  for line = 0, math.ceil(height)-1, 1 do   
+  for line = 0, math.ceil(height)-1, 1 do
     index = line + self.ypos
     skip_render = false
 
@@ -1472,7 +1472,7 @@ function SmartMenu:new(items, opts)
       self:reveal()
       self:set_selected_item(-1)
     elseif key == tb.KEY_TAB then -- or key == tb.KEY_ENTER then
-      if self.revealed then 
+      if self.revealed then
         self.input:set_text(self.menu:get_selected_item())
       end
     elseif ch then
@@ -1707,7 +1707,7 @@ local function load(opts)
     local accept = Label(opts.skip_confirm and ' OK ' or ' Yes ', merge_table(button_opts, { width = 5, left = 2 }))
     box:add(accept)
 
-    accept:once('click', function()
+    accept:once('left_click', function()
       accepted = true
       self:hide_above(box)
     end)
@@ -1717,14 +1717,10 @@ local function load(opts)
       local cancel = Label(' No ', merge_table(button_opts, { width = 4, left = 8 }))
       box:add(cancel)
 
-      cancel:once('click', function()
+      cancel:once('left_click', function()
         window:hide_above(box)
       end)
     end
-
-    box:once('click', function()
-      print('xx')
-    end)
 
     self:show_above(box)
     if not cb then return end
@@ -1756,7 +1752,7 @@ local function on_key(key, char, meta)
     window.focused:trigger('key:' .. key, key, char, meta)
   end
 
-  if window.focused then -- might have been unfocused
+  if window.focused then -- might have been unfocused by previous call
     window.focused:trigger('key', key, char, meta)
   end
 
@@ -1792,7 +1788,7 @@ local function on_click(key, x, y, count, is_motion)
   window:trigger('mouse_event', x, y, event, is_motion)
 
   if event:match('_click') then
-    -- trigger a 'click' event for all mouse clicks
+    -- trigger a 'click' event for all mouse clicks, regardless of button
     window:trigger('mouse_event', x, y, 'click')
 
     if count > 0 and count % 2 == 0 then -- four clicks in a row should count as 2 x double-click

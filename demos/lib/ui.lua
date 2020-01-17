@@ -169,7 +169,7 @@ function Box:new(opts)
 
   self.changed  = true
   self.hidden   = opts.hidden or false
-  self.shown    = opts.hidden and false or true
+  self.shown    = not self.hidden
   self.parent   = nil
   self.children = {}
   self.emitter  = Emitter:new()
@@ -468,7 +468,7 @@ end
 
 function Box:render()
   -- errwrite('rendering ' .. self.id)
-  if not self.hidden then
+  if self.shown then
     if self.changed then
       -- errwrite('changed! ' .. self.id)
       self:render_self()

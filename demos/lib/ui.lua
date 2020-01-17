@@ -980,6 +980,7 @@ function List:new(items, opts)
   self.ypos = 1
   self.selected = 0
   self.items = items or {}
+  self.nitems = table.getn(self.items)
 
   self.selection_fg = opts.selection_fg
   self.selection_bg = opts.selection_bg or tb.BLACK
@@ -1097,8 +1098,17 @@ end
 function List:set_items(arr)
   self.items = arr
   self:mark_changed()
-  self:set_ypos(1)
-  self:set_selected_item(0, false)
+  if reset_position then
+    self:set_ypos(1)
+    self:set_selected_item(0, false)
+  else
+    if self.selected > self:num_items() then
+      self:set_selected_item(self:num_items())
+    end
+    if self.ypos > self:num_items() then
+      self:move_to(self:num_items())
+    end
+  end
 end
 
 function List:set_item(number, item)

@@ -270,16 +270,16 @@ function Box:focus()
 
   -- unfocus whatever box is marked as focused
   -- store previously focused element
-  window.last_focused = window.focused
+  window.prev_focused = window.focused
 
   -- trigger unfocused for previously focused
-  if window.last_focused then window.last_focused:unfocus() end
+  if window.prev_focused then window.prev_focused:unfocus() end
 
   -- set current focused element to this
   window.focused = self
 
   -- and trigger 'focused' for newly focused, passsing prev focused as param
-  self:trigger('focused', window.last_focused)
+  self:trigger('focused', window.prev_focused)
   self:mark_changed()
 end
 
@@ -1659,8 +1659,13 @@ local function load(opts)
       end)
     end
 
+    -- store a reference to the focused window before showing
+    -- the above item. note that this is NOT the same as prev_focused
+    -- since prev_focused changes whenever a box/label/input is clicked 
+    -- and we want to return focused to the original element we had
+    -- before showing the above item.
+    self.focused_below = self.focused
     self.above_item = item
-    self.last_focused = self.focused
     item:toggle(true)
     item:focus()
   end
@@ -1672,14 +1677,15 @@ local function load(opts)
       return -- item was passed, and current above item doesn't match
     end
 
-    self.above_item:toggle(false)
-    if self.focused == self.above_item then
-      if self.last_focused then
-        self.last_focused:focus()
-        self.last_focused = nil
-      else
-        self.focused:unfocus()
-      end
+    -- this triggers 'hidden' which will remove the element 
+    -- if it didn't have a parent when show_above() was called
+    self.above_item:toggle(false) 
+
+    if self.focused_below then
+      self.focused_below:focus()
+      self.focused_below = nil
+    elseif self.focused == self.above_item then
+      self.focused:unfocus()
     end
 
     -- self:remove(above_item)

@@ -253,15 +253,15 @@ function Box:toggle(bool)
   return not hidden_val -- true if now shown
 end
 
-function Box:unfocus(focus_last)
+function Box:unfocus(focus_prev)
   if not window.focused == self then return end
 
   self:trigger('unfocused')
   self:mark_changed()
   window.focused = nil
 
-  if focus_last and window.last_focused then
-    window.last_focused:focus()
+  if focus_prev and window.prev_focused then
+    window.prev_focused:focus()
   end
 end
 

@@ -994,6 +994,9 @@ function List:new(items, opts)
   self.selection_fg = opts.selection_fg
   self.selection_bg = opts.selection_bg or tb.BLACK
 
+  self.focus_selection_fg = opts.focus_selection_fg or self.selection_fg
+  self.focus_selection_bg = opts.focus_selection_bg or self.selection_bg
+
   self.changed_line_from = nil
   self.changed_line_to = nil
 
@@ -1174,11 +1177,19 @@ function List:fix_encoding(str)
 end
 
 function List:item_fg_color(index, item, default_color)
-  return index == self.selected and self.selection_fg or default_color
+  if index == self.selected then
+    return self:is_focused() and self.focus_selection_fg or self.selection_fg or default_color
+  else
+    return default_color
+  end
 end
 
 function List:item_bg_color(index, item, default_color)
-  return index == self.selected and self.selection_bg or default_color
+  if index == self.selected then
+    return self:is_focused() and self.focus_selection_bg or self.selection_bg or default_color
+  else
+    return default_color
+  end
 end
 
 --[[

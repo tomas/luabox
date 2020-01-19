@@ -46,7 +46,7 @@ luabox.o: termbox
 
 libtermbox.a: termbox
 	@mkdir -p termbox/build
-	@cd termbox/build; cmake ..; make -j2
+	@cd termbox/build; cmake .. -DBUILD_SHARED_LIBS=OFF; make -j2
 	@cp termbox/build/libtermbox.a .
 
 termbox:

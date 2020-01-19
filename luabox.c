@@ -523,7 +523,7 @@ int luaopen_luabox(lua_State *L) {
   lua_pushnumber(L, TB_KEY_CTRL_SLASH       ); lua_setfield(L, -2, "KEY_CTRL_SLASH");
   lua_pushnumber(L, TB_KEY_CTRL_UNDERSCORE  ); lua_setfield(L, -2, "KEY_CTRL_UNDERSCORE");
   lua_pushnumber(L, TB_KEY_SPACE            ); lua_setfield(L, -2, "KEY_SPACE");
-  lua_pushnumber(L, TB_KEY_BACKSPACE2       ); lua_setfield(L, -2, "KEY_BACKSPACE2");
+  lua_pushnumber(L, TB_KEY_CTRL_BACKSPACE   ); lua_setfield(L, -2, "KEY_CTRL_BACKSPACE");
   lua_pushnumber(L, TB_KEY_CTRL_8           ); lua_setfield(L, -2, "KEY_CTRL_8");
 
   lua_pushnumber(L, TB_META_SHIFT           ); lua_setfield(L, -2, "META_SHIFT");

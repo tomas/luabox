@@ -1105,10 +1105,10 @@ function List:num_items()
 end
 
 function List:clear_items()
-  self:set_items({})
+  self:set_items({}, true)
 end
 
-function List:set_items(arr, keep_position)
+function List:set_items(arr, reset_position)
   self.items = arr
   self.nitems = table.getn(self.items)
   self:mark_changed()

@@ -7,6 +7,7 @@
 
 static int char_len;
 static char utf8_char[5];
+static int mouse_enabled = 0;
 
 #if defined(LUA_VERSION_NUM) && LUA_VERSION_NUM == 501
 
@@ -210,13 +211,19 @@ static int l_tb_stringf(lua_State *L) {
 }
 
 static int l_tb_enable_mouse(lua_State *L) {
-  tb_enable_mouse();
+  if (!mouse_enabled) tb_enable_mouse();
+  mouse_enabled = 1;
   return 0;
 }
 
 static int l_tb_disable_mouse(lua_State *L) {
-  tb_disable_mouse();
+  if (mouse_enabled) tb_disable_mouse();
+  mouse_enabled = 0;
   return 0;
+}
+
+static int l_tb_toggle_mouse(lua_State *L) {
+  return mouse_enabled ? l_tb_disable_mouse(L) : l_tb_enable_mouse(L);
 }
 
 static int l_tb_select_output_mode(lua_State *L) {
@@ -227,7 +234,7 @@ static int l_tb_select_output_mode(lua_State *L) {
   return 1;
 }
 
-void populate_event(lua_State *L) {
+static void populate_event(lua_State *L) {
   lua_pushnumber(L, event.type);
   lua_setfield(L, 1, "type");
 
@@ -368,6 +375,7 @@ static const struct luaL_Reg l_luabox[] = {
   {"hide_cursor",            l_tb_hide_cursor},
   {"enable_mouse",           l_tb_enable_mouse},
   {"disable_mouse",          l_tb_disable_mouse},
+  {"toggle_mouse",           l_tb_toggle_mouse},
   {"select_output_mode",     l_tb_select_output_mode},
   {"peek_event",             l_tb_peek_event},
   {"poll_event",             l_tb_poll_event},

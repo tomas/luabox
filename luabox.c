@@ -50,6 +50,7 @@ static int l_tb_init_with(lua_State *L) {
 }
 
 static int l_tb_shutdown(lua_State *L) {
+  mouse_enabled = 0;
   tb_shutdown();
   return 0;
 }

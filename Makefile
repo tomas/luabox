@@ -54,4 +54,4 @@ termbox:
 
 .PHONY:clean
 clean:
-	rm -f $name.o $name.a $name.so $name.os
+	rm -f *.o *.a *.so *.os

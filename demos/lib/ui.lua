@@ -1632,6 +1632,7 @@ end
 
 local function load(opts)
   local opts = opts or {}
+  assert(not window, "window already loaded")
 
   if not tb.init() then return end
   if opts.mouse then tb.enable_mouse() end
@@ -1772,9 +1773,9 @@ local function unload()
   if window then
     window:remove()
     window = nil
-    -- tb.show_cursor()
-    tb.shutdown()
   end
+  -- tb.show_cursor()
+  tb.shutdown()
 end
 
 -----------------------------------------
@@ -1782,6 +1783,8 @@ end
 
 -- we go from more specific (box, key) to less specific
 local function on_key(key, char, meta)
+  if not window then return end
+
   if window.focused then
     window.focused:trigger('key:' .. key, key, char, meta)
   end
@@ -1804,6 +1807,8 @@ local mouse_events = {
 }
 
 local function on_click(key, x, y, count, is_motion)
+  if not window then return end
+
   local event = mouse_events[key]
   if not event then return false end
 
@@ -1840,6 +1845,8 @@ local function on_click(key, x, y, count, is_motion)
 end
 
 local function on_resize(w, h)
+  if not window then return end
+
   if w > screen.width or h > screen.height then
     tb.resize()
   end
@@ -1859,6 +1866,7 @@ end
 -- loop start/stop/render
 
 local function render()
+  if not window then return end
   window:render()
   if window.above_item then
     window.above_item:render()
@@ -1874,7 +1882,7 @@ local function start()
     res = tb.peek_event(ev, 100)
 
     if res == tb.EVENT_KEY then
-      if ev.key == tb.KEY_ESC and window.above_item then
+      if ev.key == tb.KEY_ESC and window and window.above_item then
         window:hide_above()
       else
         if ev.key == tb.KEY_CTRL_C or ev.key == tb.KEY_CTRL_Q then break end

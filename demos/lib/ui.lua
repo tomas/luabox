@@ -704,8 +704,8 @@ end
 function EditableTextBox:handle_key(key, meta)
   if key == tb.KEY_ENTER and meta == 0 then
     self:handle_enter()
-  elseif key == tb.KEY_BACKSPACE then
-    if meta == tb.META_ALT then
+  elseif key == tb.KEY_BACKSPACE or key == tb.KEY_CTRL_BACKSPACE then
+    if meta == tb.META_ALT or key == tb.KEY_CTRL_BACKSPACE then
       self:delete_last_word()
     else
       self:delete_char(-1)

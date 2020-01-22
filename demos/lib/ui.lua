@@ -687,14 +687,22 @@ function EditableTextBox:new(text, opts)
   end)
 end
 
+function EditableTextBox:colors()
+  local fg, bg = EditableTextBox.super.colors(self)
+  if self.focus_fg ~= self.fg and self.placeholder and self.chars == 0 then
+    fg = self.fg
+  end
+  return fg, bg
+end
+
 function EditableTextBox:set_placeholder(text)
   self.placeholder = text
   self:mark_changed()
 end
 
 function EditableTextBox:get_text()
-  if self.placeholder and not self:is_focused() then
-  -- if self.placeholder and self.chars == 0 then
+  -- if self.placeholder and not self:is_focused() then
+  if self.placeholder and self.chars == 0 then
     return self.placeholder
   else
     return self.text

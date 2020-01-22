@@ -702,7 +702,7 @@ end
 
 function EditableTextBox:get_text()
   -- if self.placeholder and not self:is_focused() then
-  if self.placeholder and self.chars == 0 then
+  if self.placeholder and self.placeholder:len() > 0 and self.chars == 0 then
     return self.placeholder
   else
     return self.text
@@ -931,7 +931,7 @@ function EditableTextBox:get_cursor_offset(width)
 end
 
 function EditableTextBox:get_char_at_pos(pos)
-  return ustring.sub(self.text, pos, pos)
+  return ustring.sub(self:get_text(), pos, pos)
 end
 
 function EditableTextBox:render_cursor()

@@ -6,7 +6,7 @@ local ustring = require('demos.lib.ustring')
 
 local screen, window, stopped
 local box_count = 0
-local stopchars = '[ /]'
+local stopchars = '[ /#]'
 local cursor_color = tb.RED
 local page_move_ratio = 1.3
 

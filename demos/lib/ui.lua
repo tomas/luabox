@@ -1056,7 +1056,7 @@ function List:set_ypos(ypos)
 end
 
 function List:move_to(ypos, selected_pos)
-  -- if ypos > self:num_items() then 
+  -- if ypos > self:num_items() then
   --   ypos = self:num_items()
   -- end
   if ypos < 1 then ypos = 1 end
@@ -1672,7 +1672,7 @@ local function load(opts)
 
     -- store a reference to the focused window before showing
     -- the above item. note that this is NOT the same as prev_focused
-    -- since prev_focused changes whenever a box/label/input is clicked 
+    -- since prev_focused changes whenever a box/label/input is clicked
     -- and we want to return focused to the original element we had
     -- before showing the above item.
     self.focused_below = self.focused
@@ -1688,9 +1688,9 @@ local function load(opts)
       return -- item was passed, and current above item doesn't match
     end
 
-    -- this triggers 'hidden' which will remove the element 
+    -- this triggers 'hidden' which will remove the element
     -- if it didn't have a parent when show_above() was called
-    self.above_item:toggle(false) 
+    self.above_item:toggle(false)
 
     if self.focused_below then
       self.focused_below:focus()

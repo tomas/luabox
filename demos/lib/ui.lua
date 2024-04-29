@@ -740,9 +740,9 @@ function EditableTextBox:handle_key(key, meta)
     else
       self:move_cursor_right()
     end
-  elseif key == tb.KEY_ARROW_DOWN then
+  elseif key == tb.KEY_ARROW_DOWN and meta == 0 then
     self:move_cursor_down()
-  elseif key == tb.KEY_ARROW_UP then
+  elseif key == tb.KEY_ARROW_UP and meta == 0 then
     self:move_cursor_up()
   end
 end
@@ -1018,9 +1018,9 @@ function List:new(items, opts)
     -- self:mark_changed()
     local w, h = self:size()
 
-    if key == tb.KEY_ARROW_DOWN or (ch == 'j' and meta == 0) then
+    if (key == tb.KEY_ARROW_DOWN or ch == 'j') and meta == 0 then
       self:move(1)
-    elseif key == tb.KEY_ARROW_UP or (ch == 'k' and meta == 0) then
+    elseif (key == tb.KEY_ARROW_UP or ch == 'k') and meta == 0 then
       self:move(-1)
     elseif key == tb.KEY_HOME then
       self:move_to(1, 1)

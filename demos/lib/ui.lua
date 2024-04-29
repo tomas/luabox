@@ -1212,6 +1212,13 @@ function List:selection_color(index, our_color, parent_color)
 end
 ]]--
 
+function List:refresh()
+  List.super.refresh(self)
+  -- make sure we clear this as well
+  self.changed_line_from = nil
+  self.changed_line_to = nil
+end
+
 function List:render_item(formatted, x, y, fg, bg)
   -- debug({ " --> line " .. index , formatted })
   tb.string(x, y, fg, bg, formatted)

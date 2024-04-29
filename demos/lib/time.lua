@@ -70,7 +70,7 @@ elseif ffi.os == 'Linux' or ffi.os == 'OSX' then
     local CLOCK_REALTIME = 0
     local CLOCK_MONOTONIC = 1
 
-    local clock_gettime = ffi.load'rt'.time_clock_gettime
+    local clock_gettime = ffi.load'rt.so.1'.time_clock_gettime
 
     local function tos(t)
       return tonumber(t.s) + tonumber(t.ns) / 1e9

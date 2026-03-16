@@ -512,6 +512,30 @@ function Box:remove()
   self.hidden = true
 end
 
+
+local StyledBox = Box:extend()
+
+function StyledBox:render_self()
+  StyledBox.super.render_self(self)
+
+
+  local offset_x, offset_y = self:offset()
+  local width, height = self:size()
+  local fg, bg = self:colors()
+  local rounded_width = math.ceil(width)
+
+  for y = 0, math.ceil(height)-1, 1 do
+    tb.char(offset_x, y + offset_y, tb.LIGHT_GREEN, bg, '┃')
+  end
+
+  tb.char(offset_x, math.ceil(height) + offset_y, tb.LIGHT_GREEN, tb.DEFAULT, '╹')
+
+  for x = 1, math.floor(width), 1 do
+    tb.char(x + offset_x, math.ceil(height) + offset_y, bg, tb.DEFAULT, '▀')
+  end
+
+end
+
 ----------------------------------------
 
 local Label = Box:extend()
@@ -2097,6 +2121,7 @@ ui.every  = add_repeating_timer
 ui.cancel = remove_timer
 
 ui.Box        = Box
+ui.StyledBox  = StyledBox
 ui.Label      = Label
 ui.TextBox    = TextBox
 ui.EditableTextBox = EditableTextBox

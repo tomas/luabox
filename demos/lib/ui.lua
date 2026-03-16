@@ -837,7 +837,7 @@ end
 
 function EditableTextBox:set_text(text)
   EditableTextBox.super.set_text(self, text)
-  self.cursor_pos = self.chars
+  self:move_cursor_to_end()
 end
 
 function EditableTextBox:append_char(char)

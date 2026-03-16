@@ -11,16 +11,16 @@ local cursor_color = tb.RED
 local page_move_ratio = 1.3
 
 local function dump(o)
- if type(o) == 'table' then
-  local s = '{ '
-  for k,v in pairs(o) do
-    if type(k) ~= 'number' then k = '"'..k..'"' end
-    s = s .. '['..k..'] = ' .. dump(v) .. ', '
+  if type(o) == 'table' then
+    local s = '{ '
+    for k,v in pairs(o) do
+      if type(k) ~= 'number' then k = '"'..k..'"' end
+      s = s .. '['..k..'] = ' .. dump(v) .. ', '
+    end
+    return s .. '} '
+  else
+    return tostring(o)
   end
-  return s .. '} '
- else
-   return tostring(o)
- end
 end
 
 local function errwrite(str)
@@ -1287,9 +1287,11 @@ function OptionList:new(items, opts)
     end
   end)
 
-  self:on('left_click', function(mouse_x, mouse_y)
-    local x, y = self:offset()
-    self:select(self.ypos + (mouse_y - y))
+  self:on('left_click', function(mouse_x, mouse_y, meta)
+    if meta ~= tb.META_CTRL then
+      local x, y = self:offset()
+      self:select(self.ypos + (mouse_y - y))
+    end
   end)
 
   self:on('double_click', function(mouse_x, mouse_y)
@@ -1643,6 +1645,164 @@ function SmartMenu:filter_options(str)
 end
 
 -----------------------------------------
+
+local MultiOptionList = OptionList:extend()
+
+function MultiOptionList:new(items, opts)
+  -- MultiOptionList.super.new(self, items, opts)
+  OptionList.super.new(self, items, opts)
+
+  -- { [row_index] = true }  for every "extra" selected row
+  self.multi_selected = {}
+  -- Anchor row for the shift-range; nil when no range is active
+  self.shift_anchor   = nil
+
+  self.multi_sel_fg = opts.multi_sel_fg
+  self.multi_sel_bg = opts.multi_sel_bg or tb.DARK_GREY
+
+  self:on('key', function(key, ch, meta)
+    local shift = meta == tb.META_SHIFT
+
+    if key == tb.KEY_ARROW_DOWN and shift then
+      self:shift_move(1)
+      return
+
+    elseif key == tb.KEY_ARROW_UP and shift then
+      self:shift_move(-1)
+      return
+
+    elseif (key == tb.KEY_ARROW_DOWN or key == tb.KEY_ARROW_UP) and meta == 0 then
+      -- Plain arrow: discard multi-selection; OptionList handles the move.
+      self:clear_multi_selection()
+      self.shift_anchor = nil
+
+    elseif ch == ' ' or (key == tb.KEY_ENTER and meta == 0) then -- space or enter
+      self:multi_submit()
+    end
+  end)
+
+  self:on('left_click', function(mouse_x, mouse_y, meta)
+    local ox, oy = self:offset()
+    local clicked_idx = self.ypos + (mouse_y - oy)
+
+    if meta == tb.META_CTRL then
+      if self:get_item(clicked_idx) then
+        self:toggle_multi(clicked_idx)
+        -- self:set_selected_item(clicked_idx, true)
+      end
+    else
+      if self:get_item(clicked_idx) then
+        self:clear_multi_selection()
+        self:set_selected_item(clicked_idx, true)
+      end
+    end
+  end)
+
+  -- Double-click submits the current selection.
+  self:on('double_click', function(mouse_x, mouse_y)
+    if meta == tb.META_CTRL then
+      -- pending
+    else
+      self:multi_submit()
+    end
+  end)
+end
+
+function MultiOptionList:toggle_multi(index)
+  if self.multi_selected[index] then
+    self.multi_selected[index] = nil
+  else
+    self.multi_selected[index] = true
+  end
+  self:mark_changed()
+end
+
+function MultiOptionList:clear_multi_selection()
+  self.multi_selected = {}
+  self:mark_changed()
+end
+
+-- Returns a sorted array of every active row: multi_selected + cursor row.
+function MultiOptionList:get_all_selected_indices()
+  local set = {}
+  for idx in pairs(self.multi_selected) do set[idx] = true end
+  if self.selected and self.selected > 0 and self:get_item(self.selected) then
+    set[self.selected] = true
+  end
+  local result = {}
+  for idx in pairs(set) do table.insert(result, idx) end
+  table.sort(result)
+  return result
+end
+
+-- Extend (or start) a contiguous shift-selection range.
+function MultiOptionList:shift_move(dir)
+  if not self.shift_anchor then
+    self.shift_anchor = (self.selected > 0) and self.selected or 1
+  end
+
+  local nitems = self:num_items()
+  local new_sel = self.selected + dir
+  if new_sel < 1      then new_sel = 1      end
+  if new_sel > nitems then new_sel = nitems end
+
+  -- Scroll if needed.
+  local _, height = self:size()
+  if new_sel < self.ypos or new_sel >= self.ypos + height then
+    OptionList.super.move(self, dir)
+  end
+
+  self:set_selected_item(new_sel, true)
+
+  -- Repaint range as [anchor .. cursor].
+  self.multi_selected = {}
+  local lo = math.min(self.shift_anchor, new_sel)
+  local hi = math.max(self.shift_anchor, new_sel)
+  for i = lo, hi do self.multi_selected[i] = true end
+  self:mark_changed()
+end
+
+-- Submit the current selection.
+-- Multi (>1 row):  trigger('submit', indices_array, results_array)
+-- Single row:      delegates to OptionList:submit() -> trigger('submit', index, item)
+function MultiOptionList:multi_submit()
+  local indices = self:get_all_selected_indices()
+  if #indices > 1 then
+    local results = {}
+    for _, idx in ipairs(indices) do
+      -- table.insert(results, { index = idx, item = self:get_item(idx) })
+      table.insert(results, self:get_item(idx))
+    end
+    self:trigger('submit', indices, results)
+  else
+    local item = self:get_selected_item()
+    if item then
+      self:trigger('submit', self.selected, { item })
+    end
+  end
+end
+
+function MultiOptionList:item_fg_color(index, item, default_color)
+  if index == self.selected then
+    return MultiOptionList.super.item_fg_color(self, index, item, default_color)
+  end
+  if self.multi_selected[index] then
+    return self.multi_sel_fg or default_color
+  end
+  return default_color
+end
+
+function MultiOptionList:item_bg_color(index, item, default_color)
+  if index == self.selected then
+    return MultiOptionList.super.item_bg_color(self, index, item, default_color)
+  end
+  if self.multi_selected[index] then
+    return self.multi_sel_bg or default_color
+  end
+  return default_color
+end
+
+-----------------------------------------
 -- load/unload UI
 
 local function load(opts)
@@ -1821,7 +1981,7 @@ local mouse_events = {
   [tb.KEY_MOUSE_WHEEL_DOWN] = 'scroll_down'
 }
 
-local function on_click(key, x, y, count, is_motion)
+local function on_click(key, x, y, count, is_motion, meta)
   if not window then return end
 
   local event = mouse_events[key]
@@ -1829,32 +1989,35 @@ local function on_click(key, x, y, count, is_motion)
 
   if is_motion then return end
 
+  -- -- stash raw mouse meta on window so widgets (e.g. MultiOptionList) can read it
+  -- if window then window.last_mouse_meta = raw_meta or 0 end
+
   if window.above_item then
     if window.above_item:contains(x, y) then
       window.above_item:trigger(event, x, y)
-      window.above_item:trigger('mouse_event', x, y, event)
+      window.above_item:trigger('mouse_event', x, y, event, meta)
     else
       window:hide_above()
     end
     return -- we don't want to propagate
   end
 
-  window:trigger('mouse_event', x, y, event, is_motion)
+  window:trigger('mouse_event', x, y, event, meta)
 
   if event:match('_click') then
     -- trigger a 'click' event for all mouse clicks, regardless of button
-    window:trigger('mouse_event', x, y, 'click')
+    window:trigger('mouse_event', x, y, 'click', meta)
 
     if count > 0 and count % 2 == 0 then -- four clicks in a row should count as 2 x double-click
-      window:trigger('mouse_event', x, y, 'double_click')
+      window:trigger('mouse_event', x, y, 'double_click', meta)
     elseif count > 0 and count % 3 == 0 then -- same as above, but x3
-      window:trigger('mouse_event', x, y, 'triple_click')
+      window:trigger('mouse_event', x, y, 'triple_click', meta)
     end
 
   elseif event:match('scroll_') then
     -- trigger a 'scroll' event for up/down
     local dir = key == tb.KEY_MOUSE_WHEEL_UP and -5 or 5
-    window:trigger('mouse_event', x, y, 'scroll', dir)
+    window:trigger('mouse_event', x, y, 'scroll', dir, raw_meta)
   end
 
 end
@@ -1905,7 +2068,7 @@ local function start()
       end
 
     elseif res == tb.EVENT_MOUSE then
-      on_click(ev.key, ev.x, ev.y, ev.clicks, ev.meta == 9)
+      on_click(ev.key, ev.x, ev.y, ev.clicks, ev.meta == 9, ev.meta)
 
     elseif res == tb.EVENT_RESIZE then
       on_resize(ev.w, ev.h)
@@ -1940,6 +2103,7 @@ ui.EditableTextBox = EditableTextBox
 ui.TextInput = TextInput
 ui.List       = List
 ui.OptionList = OptionList
+ui.MultiOptionList = MultiOptionList
 ui.Menu       = Menu
 ui.SmartMenu  = SmartMenu
 

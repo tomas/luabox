@@ -28,6 +28,22 @@ local function dump(o)
   end
 end
 
+local function trim_newline(str)
+  local eol = str:find('[\r\n]$')
+  if not eol then
+    return str
+  end
+  return str:sub(1, eol - 1)
+end
+
+local function split_by_newlines(str)
+  local res = {}
+  for line in string.gmatch(str, "([^\n]*)\n?") do
+    table.insert(res, line)
+  end
+  return res
+end
+
 local function errwrite(str)
   io.stderr:write(str .. "\n")
 end
@@ -129,8 +145,8 @@ end
 local Rect = Object:extend()
 
 function Rect:new(opts)
-  self.width  = opts.width
-  self.height = opts.height
+  self.width  = opts.width -- or 1
+  self.height = opts.height -- or 1
 end
 
 Container = Rect:extend()
@@ -443,8 +459,8 @@ function Box:margin()
 
   -- raw width to calculate in case the width is %
   local w, h = self.width, self.height
-  if w and w < 1 then w = w * parent_w end
-  if h and h < 1 then h = h * parent_h end
+  if w and w <= 1 then w = w * parent_w end
+  if h and h <= 1 then h = h * parent_h end
 
   local vert_pos = self.vertical_pos
   local horiz_pos = self.horizontal_pos
@@ -453,16 +469,16 @@ function Box:margin()
 
   -- position "top" is a bit unnecessary, but what the hell.
   if vert_pos == 'center' then
-    top    = (parent_h - h)/2
-    bottom = (parent_h - h)/2
+    top    = (parent_h - h)/2 + (self.top or 0)
+    bottom = (parent_h - h)/2 + (self.bottom or 0)
   else
     top    = vert_pos == "bottom" and (parent_h - (h or 0) - self.bottom) or (self.top >= 1 and self.top or parent_h * self.top)
     bottom = vert_pos == "top" and (parent_h - (h or 0) - self.top) or (self.bottom >= 1 and self.bottom or parent_h * self.bottom)
   end
 
   if horiz_pos == 'center' then
-    left   = (parent_w - w)/2
-    right  = (parent_w - w)/2
+    left   = (parent_w - w)/2 + (self.left or 0)
+    right  = (parent_w - w)/2 + (self.right or 0)
   else
     left   = horiz_pos == "right" and (parent_w - (w or 0) - self.right) or (self.left >= 1 and self.left or parent_w * self.left)
     right  = horiz_pos == "left" and (parent_w - (w or 0) - self.left) or (self.right >= 1 and self.right or parent_w * self.right)
@@ -635,7 +651,54 @@ function StyledBox:render_self()
   for x = 1, math.floor(width), 1 do
     tb.char(x + offset_x, math.ceil(height) + offset_y, bg, tb.DEFAULT, '▀')
   end
+end
 
+----------------------------------------
+
+local Drawing = Box:extend()
+
+function Drawing:new(str, opts)
+  local opts = opts or {}
+  Drawing.super.new(self, opts)
+
+  self.auto_width = true -- so we resize when setting a bigger text
+  self:set(str)
+end
+
+function Drawing:get()
+  return self.lines
+end
+
+function Drawing:set(str)
+  local trimmed = trim_newline(str)
+  self.lines = split_by_newlines(str)
+  self.height = #self.lines
+
+  local w = ustring.len(self.lines[1])
+  for line = 1, self.height-1, 1 do
+    local w2 = ustring.len(self.lines[line])
+    if w2 > w then
+      w = w2
+    end
+  end
+
+  self.width = w
+  self:mark_changed()
+end
+
+function Drawing:render_self()
+  Drawing.super.render_self(self)
+
+  local x, y = self:offset()
+  local fg, bg = self:colors()
+  local width, height = self:size()
+  if width == 0 or height == 0 then return end
+
+  -- local str = ustring.sub(self.text, 0, math.floor(width))
+  for line = 0, height-1, 1 do
+    -- tb.string(x, y, fg, bg, self.lines[line+1])
+    tb.string(x, y + line, fg, bg, self.lines[line+1])
+  end
 end
 
 ----------------------------------------
@@ -653,7 +716,7 @@ function Label:new(text, opts)
   self:set_text(text)
 end
 
-function Label:get_text(text)
+function Label:get_text()
   return self.text
 end
 
@@ -674,7 +737,7 @@ function Label:render_self()
   if width == 0 or height == 0 then return end
 
   local str = ustring.sub(self.text, 0, math.floor(width))
-  tb.string(x, y, fg, bg, str)
+  tb.string(x, y, fg, bg, tostring(x) .. "-" .. tostring(y))
 end
 
 ----------------------------------------
@@ -2319,6 +2382,7 @@ ui.cancel = remove_timer
 
 ui.Box        = Box
 ui.StyledBox  = StyledBox
+ui.Drawing    = Drawing
 ui.Label      = Label
 ui.TextBox    = TextBox
 ui.EditableTextBox = EditableTextBox

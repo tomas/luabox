@@ -16,6 +16,7 @@ tb.render()
 local ev = {}
 -- clicks = 0
 tb.enable_mouse()
+tb.enable_focus_tracking()
 
 repeat
   local t = tb.poll_event(ev)
@@ -30,6 +31,9 @@ repeat
     w = ev.w
     h = ev.h
     tb.stringf((w/2)-10, h/2, bg, fg, "Window resized to: %dx%d", w, h)
+
+  elseif t == tb.EVENT_FOCUS then
+    tb.stringf((w/2)-10, h/2, bg, fg, "Window focused: %d", ev.key)
 
   elseif t == tb.EVENT_MOUSE then
     if ev.key == tb.KEY_MOUSE_LEFT then

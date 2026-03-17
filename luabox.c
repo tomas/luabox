@@ -8,6 +8,7 @@
 static int char_len;
 static char utf8_char[5];
 static int mouse_enabled = 0;
+static int focus_tracking_enabled = 0;
 
 #if defined(LUA_VERSION_NUM) && LUA_VERSION_NUM == 501
 
@@ -223,6 +224,18 @@ static int l_tb_disable_mouse(lua_State *L) {
   return 0;
 }
 
+static int l_tb_enable_focus_tracking(lua_State *L) {
+  if (!focus_tracking_enabled) tb_enable_focus_tracking();
+  focus_tracking_enabled = 1;
+  return 0;
+}
+
+static int l_tb_disable_focus_tracking(lua_State *L) {
+  if (focus_tracking_enabled) tb_disable_focus_tracking();
+  focus_tracking_enabled = 0;
+  return 0;
+}
+
 static int l_tb_toggle_mouse(lua_State *L) {
   return mouse_enabled ? l_tb_disable_mouse(L) : l_tb_enable_mouse(L);
 }
@@ -255,6 +268,11 @@ static void populate_event(lua_State *L) {
 
     lua_pushnumber(L, event.h);
     lua_setfield(L, 1, "clicks"); // click count
+
+  } else if (event.type == TB_EVENT_FOCUS) {
+
+    lua_pushnumber(L, event.key);
+    lua_setfield(L, 1, "key");
 
   } else if (event.type == TB_EVENT_KEY) {
 
@@ -377,6 +395,8 @@ static const struct luaL_Reg l_luabox[] = {
   {"enable_mouse",           l_tb_enable_mouse},
   {"disable_mouse",          l_tb_disable_mouse},
   {"toggle_mouse",           l_tb_toggle_mouse},
+  {"enable_focus_tracking",  l_tb_enable_focus_tracking},
+  {"disable_focus_tracking", l_tb_disable_focus_tracking},
   {"select_output_mode",     l_tb_select_output_mode},
   {"peek_event",             l_tb_peek_event},
   {"poll_event",             l_tb_poll_event},
@@ -413,6 +433,7 @@ int luaopen_luabox(lua_State *L) {
   lua_pushnumber(L, TB_EVENT_KEY    ); lua_setfield(L, -2, "EVENT_KEY");
   lua_pushnumber(L, TB_EVENT_RESIZE ); lua_setfield(L, -2, "EVENT_RESIZE");
   lua_pushnumber(L, TB_EVENT_MOUSE  ); lua_setfield(L, -2, "EVENT_MOUSE");
+  lua_pushnumber(L, TB_EVENT_FOCUS  ); lua_setfield(L, -2, "EVENT_FOCUS");
 
   // text attributes
   lua_pushnumber(L, TB_BOLD         ); lua_setfield(L, -2, "BOLD");

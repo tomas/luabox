@@ -140,6 +140,39 @@ local function clear_timers()
   timers = {}
 end
 
+local function start_blink_timer()
+  if cursor_blink_timer then return end
+
+  -- start cursor blink timer
+  cursor_blink_on = true
+  cursor_blink_timer = add_repeating_timer(cursor_blink_ms, function()
+    if window and window.focused then
+      cursor_blink_on = not cursor_blink_on
+      -- mark only the focused widget as changed so it redraws the cursor cell
+      window.focused:mark_changed()
+    end
+  end, 'cursor_blink')
+end
+
+local function stop_blink_timer()
+  if cursor_blink_timer then
+    remove_timer(cursor_blink_timer)
+    cursor_blink_timer = nil
+  end
+  cursor_blink_on = true
+end
+
+local function toggle_blink_timer(is_focused)
+  if is_focused then
+    start_blink_timer()
+  else
+    stop_blink_timer()
+  end
+  if window and window.focused then
+    window.focused:mark_changed()
+  end
+end
+
 -------------------------------------------------------------
 
 local Rect = Object:extend()
@@ -459,8 +492,8 @@ function Box:margin()
 
   -- raw width to calculate in case the width is %
   local w, h = self.width, self.height
-  if w and w <= 1 then w = w * parent_w end
-  if h and h <= 1 then h = h * parent_h end
+  if w and w < 1 then w = w * parent_w end
+  if h and h < 1 then h = h * parent_h end
 
   local vert_pos = self.vertical_pos
   local horiz_pos = self.horizontal_pos
@@ -737,7 +770,7 @@ function Label:render_self()
   if width == 0 or height == 0 then return end
 
   local str = ustring.sub(self.text, 0, math.floor(width))
-  tb.string(x, y, fg, bg, tostring(x) .. "-" .. tostring(y))
+  tb.string(x, y, fg, bg, str)
 end
 
 ----------------------------------------
@@ -2011,16 +2044,7 @@ local function load(opts)
   if opts.mouse then tb.enable_mouse() end
   tb.hide_cursor()
   tb.enable_focus_tracking()
-
-  -- start cursor blink timer
-  cursor_blink_on = true
-  cursor_blink_timer = add_repeating_timer(cursor_blink_ms, function()
-    if window and window.focused then
-      cursor_blink_on = not cursor_blink_on
-      -- mark only the focused widget as changed so it redraws the cursor cell
-      window.focused:mark_changed()
-    end
-  end, 'cursor_blink')
+  start_blink_timer()
 
   screen = Container({
     width = tb.width(),
@@ -2154,11 +2178,7 @@ local function load(opts)
 end
 
 local function unload()
-  if cursor_blink_timer then
-    remove_timer(cursor_blink_timer)
-    cursor_blink_timer = nil
-  end
-  cursor_blink_on = true
+  stop_blink_timer()
   if window then
     window:remove()
     window = nil
@@ -2352,7 +2372,9 @@ local function start()
       on_click(ev.key, ev.x, ev.y, ev.clicks, ev.meta == 9, ev.meta)
 
     elseif res == tb.EVENT_FOCUS then
-      window:set_focused(ev.key == 1)
+      local is_focused = ev.key == 1
+      toggle_blink_timer(is_focused)
+      window:set_focused(is_focused)
 
     elseif res == tb.EVENT_RESIZE then
       on_resize(ev.w, ev.h)

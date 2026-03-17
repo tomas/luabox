@@ -7,8 +7,13 @@ local ustring = require('demos.lib.ustring')
 local screen, window, stopped
 local box_count = 0
 local stopchars = '[ /#%.]'
-local cursor_color = tb.RED
 local page_move_ratio = 1.3
+local default_cursor_color = tb.RED
+
+-- Cursor blink state: true = cursor visible (filled block), false = hollow square
+local cursor_blink_on   = true
+local cursor_blink_ms   = 500  -- toggle every 500 ms
+local cursor_blink_timer = nil
 
 local function dump(o)
   if type(o) == 'table' then
@@ -150,6 +155,106 @@ function Container:colors()
   return 0, 0
 end
 
+local Window = Container:extend()
+
+function Window:new(screen, opts)
+  -- Window.super.new(self, opts)
+  self.parent = screen
+  self.children = {}
+  self.emitter  = Emitter:new()
+  self.fg = opts and opts.fg
+  self.bg = opts and opts.bg
+  self.window_focused = true
+  self.shown = true
+
+  self:on('mouse_event', function(x, y, evt, ...)
+    for _, child in ipairs(self.children) do
+      if child.shown and child:contains(x, y) then
+        child:trigger('mouse_event', x, y, evt, ...)
+        child:trigger(evt, x, y, ...)
+      end
+    end
+  end)
+end
+
+function Window:set_focused(bool)
+  self.window_focused = bool
+end
+
+function Window:is_focused()
+  return self.window_focused
+end
+
+function Window:on(evt, fn)
+  return self.emitter:on(evt, fn)
+end
+
+function Window:once(evt, fn)
+  return self.emitter:once(evt, fn)
+end
+
+function Window:trigger(evt, ...)
+  return self.emitter:emit(evt, ...)
+end
+
+function Window:add(child)
+  if child.parent then
+    errwrite("Child already has a parent!")
+    return
+  end
+
+  child.parent = self
+  table.insert(self.children, child)
+  self:trigger('child_added', child)
+  -- self:mark_changed()
+  return child
+end
+
+function Window:render()
+  for _, child in ipairs(self.children) do
+    -- if child is current above item, skip rendering
+    -- as it will be called after all elements have been drawn
+    if window.above_item ~= child then
+      child:render()
+    end
+  end
+end
+
+function Window:refresh()
+  for _, child in ipairs(self.children) do
+    child:refresh()
+  end
+end
+
+function Window:remove_tree()
+  for _, child in ipairs(self.children) do
+    child:remove()
+  end
+end
+
+function Window:remove()
+  self:remove_tree()
+  self.emitter:removeAllListeners()
+  -- self.hidden = true
+end
+
+function Window:colors()
+  local fg = self.fg or tb.DEFAULT
+  local bg = self.bg or tb.DEFAULT
+  return fg, bg
+end
+
+function Window:size()
+  local w, h = self.parent:size()
+  return w, h
+end
+
+function Window:offset()
+  return 0, 0
+end
+
+----------------
+
 local Box = Container:extend()
 
 Box.next_id = function()
@@ -178,7 +283,6 @@ function Box:new(opts)
   self.parent   = nil
   self.children = {}
   self.emitter  = Emitter:new()
-
 
   -- self:on('resized', function(new_w, new_h)
   --   self:mark_changed()
@@ -512,12 +616,10 @@ function Box:remove()
   self.hidden = true
 end
 
-
 local StyledBox = Box:extend()
 
 function StyledBox:render_self()
   StyledBox.super.render_self(self)
-
 
   local offset_x, offset_y = self:offset()
   local width, height = self:size()
@@ -700,6 +802,7 @@ local EditableTextBox = TextBox:extend()
 function EditableTextBox:new(text, opts)
   EditableTextBox.super.new(self, text, opts or {})
   self.placeholder = opts.placeholder
+  self.cursor_color = opts.cursor_color or default_cursor_color
 
   self:on('key', function(key, char, meta)
     if char == '' or meta > 2 then
@@ -970,13 +1073,21 @@ function EditableTextBox:render_cursor()
     return -- don't render cursor, we're off limits
   end
 
-  tb.string(x + cursor_x, y + cursor_y, fg, cursor_color, (char == '' or char == '\n') and ' ' or char)
+  if window:is_focused() then
+    if cursor_blink_on then
+      -- blink-on phase: filled block cursor drawn over the character
+      tb.string(x + cursor_x, y + cursor_y, fg, self.cursor_color, (char == '' or char == '\n') and ' ' or char)
+    end
+  else
+    tb.string(x + cursor_x, y + cursor_y, self.cursor_color, bg, '░') -- U+25A1 □
+  end
 end
 
 function EditableTextBox:render_self()
   EditableTextBox.super.render_self(self)
   if self:is_focused() then
-    self:render_cursor()
+    self:render_cursor(true)
+    self.changed = true
   end
 end
 
@@ -1836,14 +1947,25 @@ local function load(opts)
   if not tb.init() then return end
   if opts.mouse then tb.enable_mouse() end
   tb.hide_cursor()
+  tb.enable_focus_tracking()
+
+  -- start cursor blink timer
+  cursor_blink_on = true
+  cursor_blink_timer = add_repeating_timer(cursor_blink_ms, function()
+    if window and window.focused then
+      cursor_blink_on = not cursor_blink_on
+      -- mark only the focused widget as changed so it redraws the cursor cell
+      window.focused:mark_changed()
+    end
+  end, 'cursor_blink')
 
   screen = Container({
     width = tb.width(),
     height = tb.height()
   })
 
-  window = Box({
-    id = "window",
+  window = Window(screen, {
+    -- id = "window",
     fg = tb.DEFAULT,
     bg = tb.DEFAULT
   })
@@ -1964,11 +2086,16 @@ local function load(opts)
     end)
   end
 
-  window.parent = screen
+  -- window.parent = screen
   return window
 end
 
 local function unload()
+  if cursor_blink_timer then
+    remove_timer(cursor_blink_timer)
+    cursor_blink_timer = nil
+  end
+  cursor_blink_on = true
   if window then
     window:remove()
     window = nil
@@ -2046,6 +2173,65 @@ local function on_click(key, x, y, count, is_motion, meta)
 
 end
 
+-- Recursively collect {box, ox, oy, w, h} for all shown boxes in the tree
+local function collect_rects(box, result)
+  result = result or {}
+  if box.shown then
+    if box.id then -- window doesn't have and id
+      local ox, oy = box:offset()
+      local w, h   = box:size()
+      result[box]  = { id = box.id, ox = ox, oy = oy, w = w, h = h }
+    end
+    for _, child in ipairs(box.children) do
+      collect_rects(child, result)
+    end
+  end
+  return result
+end
+
+-- Mark only boxes whose position or size changed as dirty.
+-- Also mark any box that now overlaps a region that a changed box previously
+-- occupied (so vacated areas are repainted by their new occupant).
+local function mark_changed_rects(old_rects, new_rects)
+  local dirty_regions = {}  -- list of {ox,oy,w,h} that need repainting
+
+  for box, new_r in pairs(new_rects) do
+    local old_r = old_rects[box]
+    if old_r then
+      if old_r.ox ~= new_r.ox or old_r.oy ~= new_r.oy or
+         old_r.w  ~= new_r.w  or old_r.h  ~= new_r.h  then
+        box:mark_changed()
+        -- record both old and new regions as dirty so neighbours can repaint
+        table.insert(dirty_regions, old_r)
+        table.insert(dirty_regions, new_r)
+      end
+    else
+      -- new box (wasn't visible before), always redraw
+      box:mark_changed()
+      table.insert(dirty_regions, new_r)
+    end
+  end
+
+  -- any box that intersects a dirty region but wasn't already marked must also repaint
+  local function rects_overlap(a, b)
+    return not (a.ox + a.w <= b.ox or b.ox + b.w <= a.ox or
+                a.oy + a.h <= b.oy or b.oy + b.h <= a.oy)
+  end
+
+  if #dirty_regions > 0 then
+    for box, new_r in pairs(new_rects) do
+      if not box.changed then
+        for _, dr in ipairs(dirty_regions) do
+          if rects_overlap(new_r, dr) then
+            box:mark_changed()
+            break
+          end
+        end
+      end
+    end
+  end
+end
+
 local function on_resize(w, h)
   if not window then return end
 
@@ -2054,13 +2240,21 @@ local function on_resize(w, h)
   end
 
   add_immediate_timer(function()
+    -- snapshot every box's current rect BEFORE updating screen size
+    local old_rects = collect_rects(window)
+
+    -- apply new screen dimensions
     screen.width  = w
     screen.height = h
 
-    -- trigger a 'resize' even on the main window
-    -- this will cascade down to child elements, recursively.
+    -- trigger 'resized' so widgets can update internal state (e.g. scroll limits)
     window:trigger('resized', w, h)
-    window:refresh()
+
+    -- snapshot new rects now that layout has been recalculated
+    local new_rects = collect_rects(window)
+
+    -- mark only the boxes whose geometry changed (or that overlap changed regions)
+    mark_changed_rects(old_rects, new_rects)
   end, 'resize')
 end
 
@@ -2093,6 +2287,9 @@ local function start()
 
     elseif res == tb.EVENT_MOUSE then
       on_click(ev.key, ev.x, ev.y, ev.clicks, ev.meta == 9, ev.meta)
+
+    elseif res == tb.EVENT_FOCUS then
+      window:set_focused(ev.key == 1)
 
     elseif res == tb.EVENT_RESIZE then
       on_resize(ev.w, ev.h)

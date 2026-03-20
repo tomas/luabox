@@ -1606,6 +1606,35 @@ function Menu:new(items, opts)
 end
 
 function Menu:set_offset(x, y)
+  local _, menu_h = self:size()
+
+  -- print(x, y, menu_h, screen.height, screen.width)
+
+  if menu_h > 0 and screen.height > 0 then
+    if y + menu_h > screen.height then
+      y = y - menu_h - 1
+    end
+    if y < 1 then
+      y = 1
+    end
+  end
+
+  if screen.width > 0 then
+    local menu_w = self.width
+    if not menu_w then
+      local longest = self:get_longest_item()
+      menu_w = longest and ustring.len(longest) or 0
+      if self.min_width and menu_w < self.min_width then
+        menu_w = self.min_width
+      end
+    end
+    if x + menu_w - 1 > screen.width then
+      x = screen.width - menu_w + 1
+    end
+    if x < 1 then
+      x = 1
+    end
+  end
   self.offset_x = x
   self.offset_y = y
 end

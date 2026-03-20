@@ -1635,6 +1635,7 @@ function Menu:set_offset(x, y)
       x = 1
     end
   end
+
   self.offset_x = x
   self.offset_y = y
 end
@@ -1945,16 +1946,17 @@ function MultiOptionList:new(items, opts)
     local ox, oy = self:offset()
     local clicked_idx = self.ypos + (mouse_y - oy)
 
-    if meta == tb.META_CTRL then
-      if self:get_item(clicked_idx) then
-        self:toggle_multi(clicked_idx)
-        -- self:set_selected_item(clicked_idx, true)
-      end
+    if not self:get_item(clicked_idx) then return end
+
+    if meta == tb.META_SHIFT then
+      print('left click + shift', clicked_idx)
+      self:select_range_to(clicked_idx)
+    elseif meta == tb.META_CTRL then
+      self:toggle_multi(clicked_idx)
+      -- self:set_selected_item(clicked_idx, true)
     else
-      if self:get_item(clicked_idx) then
-        self:clear_multi_selection()
-        self:set_selected_item(clicked_idx, true)
-      end
+      self:clear_multi_selection()
+      self:set_selected_item(clicked_idx, true)
     end
   end)
 
@@ -1974,6 +1976,25 @@ function MultiOptionList:toggle_multi(index)
   else
     self.multi_selected[index] = true
   end
+  self:mark_changed()
+end
+
+-- Select all items from shift_anchor (or current selection) to clicked_idx, inclusive.
+-- The clicked item becomes the new cursor position.
+function MultiOptionList:select_range_to(clicked_idx)
+  if not self.shift_anchor then
+    self.shift_anchor = (self.selected > 0) and self.selected or 1
+  end
+
+  local lo = math.min(self.shift_anchor, clicked_idx)
+  local hi = math.max(self.shift_anchor, clicked_idx)
+
+  self.multi_selected = {}
+  for i = lo, hi do
+    self.multi_selected[i] = true
+  end
+
+  self:set_selected_item(clicked_idx, true)
   self:mark_changed()
 end
 

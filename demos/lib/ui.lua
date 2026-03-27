@@ -674,15 +674,16 @@ function StyledBox:render_self()
   local width, height = self:size()
   local fg, bg = self:colors()
   local rounded_width = math.ceil(width)
+  local parent_fg, parent_bg = self.parent:colors()
 
   for y = 0, math.ceil(height)-1, 1 do
     tb.char(offset_x, y + offset_y, tb.LIGHT_GREEN, bg, '┃')
   end
 
-  tb.char(offset_x, math.ceil(height) + offset_y, tb.LIGHT_GREEN, tb.DEFAULT, '╹')
+  tb.char(offset_x, math.ceil(height) + offset_y, tb.LIGHT_GREEN, parent_bg, '╹')
 
   for x = 1, math.floor(width), 1 do
-    tb.char(x + offset_x, math.ceil(height) + offset_y, bg, tb.DEFAULT, '▀')
+    tb.char(x + offset_x, math.ceil(height) + offset_y, bg, parent_bg, '▀')
   end
 end
 

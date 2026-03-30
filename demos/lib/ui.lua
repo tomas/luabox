@@ -325,6 +325,8 @@ function Box:new(opts)
 
   self.vertical_pos   = opts.vertical_pos   -- top, center or bottom
   self.horizontal_pos = opts.horizontal_pos -- left, center or right
+  self.height_floor   = opts.height_floor or false
+  self.width_floor    = opts.width_floor or false
 
   self.changed  = true
   self.hidden   = opts.hidden or false
@@ -548,6 +550,9 @@ function Box:size()
     h = parent_h - (top + bottom)
   end
 
+  if self.width_floor then w = math.floor(w) end
+  if self.height_floor then h = math.floor(h) end
+
   return w, h
 end
 
@@ -596,10 +601,9 @@ function Box:clear()
   local offset_x, offset_y = self:offset()
   local width, height = self:size()
   local fg, bg = self:colors()
-  local rounded_width = math.ceil(width)
+  local rounded_width = self.width_floor and math.floor(width) or math.ceil(width)
 
-  -- debug({ "clearing " .. self.id, offset_x, width })
-  for y = 0, math.ceil(height)-1, 1 do
+  for y = 0, (self.height_floor and math.floor(height) or math.ceil(height)) - 1, 1 do
     self:clear_line(offset_x, y + offset_y, fg, bg, self.bg_char, rounded_width)
 
     -- for x = 0, math.floor(width), 1 do
@@ -673,17 +677,18 @@ function StyledBox:render_self()
   local offset_x, offset_y = self:offset()
   local width, height = self:size()
   local fg, bg = self:colors()
-  local rounded_width = math.ceil(width)
+  local rounded_width = self.width_floor and math.floor(width) or math.ceil(width)
   local parent_fg, parent_bg = self.parent:colors()
+  local h = self.height_floor and math.floor(height) or math.ceil(height)
 
-  for y = 0, math.ceil(height)-1, 1 do
+  for y = 0, h - 1, 1 do
     tb.char(offset_x, y + offset_y, tb.LIGHT_GREEN, bg, '┃')
   end
 
-  tb.char(offset_x, math.ceil(height) + offset_y, tb.LIGHT_GREEN, parent_bg, '╹')
+  tb.char(offset_x, h + offset_y, tb.LIGHT_GREEN, parent_bg, '╹')
 
-  for x = 1, math.floor(width), 1 do
-    tb.char(x + offset_x, math.ceil(height) + offset_y, bg, parent_bg, '▀')
+  for x = 1, math.floor(width - 1), 1 do
+    tb.char(x + offset_x, h + offset_y, bg, parent_bg, '▀')
   end
 end
 
@@ -1464,13 +1469,14 @@ function List:render_self()
   local x, y = self:offset()
   local width, height = self:size()
   local fg, bg = self:colors()
-  local rounded_width = width % 1 == 0 and width or math.floor(width)+1
+  local rounded_width = width % 1 == 0 and width or math.floor(width) + 1
   local index, item, formatted, diff, skip_render
+  local h = self.height_floor and math.floor(height) or math.ceil(height)
 
   -- if horizontal pos is right, then align text to the right and move X offset
   local align_right = self.horizontal_pos == 'right'
 
-  for line = 0, math.ceil(height)-1, 1 do
+  for line = 0, h - 1, 1 do
     index = line + self.ypos
     skip_render = false
 

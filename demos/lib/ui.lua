@@ -327,6 +327,8 @@ function Box:new(opts)
   self.horizontal_pos = opts.horizontal_pos -- left, center or right
   self.height_floor   = opts.height_floor or false
   self.width_floor    = opts.width_floor or false
+  self.top_floor      = opts.top_floor or false
+  self.left_floor     = opts.left_floor or false
 
   self.changed  = true
   self.hidden   = opts.hidden or false
@@ -525,7 +527,9 @@ end
 function Box:offset()
   local x, y = self.parent:offset()
   local top, right, bottom, left = self:margin()
-  return math.ceil(x + left), math.ceil(y + top)
+  local x_offset = self.left_floor and math.floor(x + left) or math.ceil(x + left)
+  local y_offset = self.top_floor and math.floor(y + top) or math.ceil(y + top)
+  return x_offset, y_offset
 end
 
 function Box:size()
@@ -539,13 +543,18 @@ function Box:size()
 
   if self.width then -- width of parent
     w = self.width >= 1 and self.width or parent_w * self.width
+    if self.right and self.right > 0 then
+      w = w - (self.right >= 1 and self.right or parent_w * self.right)
+    end
   else -- width not set. parent width minus left/right margins
     w = parent_w - (left + right)
-    -- debug({ "width not set", self.id, parent_w, left, right, "result => ", w })
   end
 
   if self.height then -- height of parent
     h = self.height >= 1 and self.height or parent_h * self.height
+    if self.bottom and self.bottom > 0 then
+      h = h - (self.bottom >= 1 and self.bottom or parent_h * self.bottom)
+    end
   else -- height not set. parent height minus top/bottom margins
     h = parent_h - (top + bottom)
   end
@@ -605,10 +614,6 @@ function Box:clear()
 
   for y = 0, (self.height_floor and math.floor(height) or math.ceil(height)) - 1, 1 do
     self:clear_line(offset_x, y + offset_y, fg, bg, self.bg_char, rounded_width)
-
-    -- for x = 0, math.floor(width), 1 do
-    --   tb.char(x + offset_x, y + offset_y, fg, bg, self.bg_char)
-    -- end
   end
 end
 
@@ -1473,7 +1478,6 @@ function List:render_self()
   local index, item, formatted, diff, skip_render
   local h = self.height_floor and math.floor(height) or math.ceil(height)
 
-  -- if horizontal pos is right, then align text to the right and move X offset
   local align_right = self.horizontal_pos == 'right'
 
   for line = 0, h - 1, 1 do

@@ -18,11 +18,14 @@ end
 local header = ui.Box({ height = 1, bg_char = 0x2573 })
 window:add(header)
 
-local left = ui.Box({ top = 1, bottom = 1, width = 0.8, bg = tb.DARKER_GREY })
-window:add(left)
+local content = ui.Box({ flexDirection = "row", marginTop = 1, marginBottom = 1 })
+window:add(content)
 
-local right = ui.Box({ top = 1, left = 0.8, bottom = 1, width = 0.5, bg = tb.DARK_GREY })
-window:add(right)
+local left = ui.Box({ flexGrow = 1, bg = tb.DARKER_GREY })
+content:add(left)
+
+local right = ui.Box({ flexGrow = 1, bg = tb.DARK_GREY })
+content:add(right)
 
 text = [[
 This function returns a formated version
@@ -38,16 +41,16 @@ form suitable to be safely read back by the
 Lua interpreter. The string is written between
 double quotes, and all double quotes, returns
 and backslashes in the string are correctly
-escaped when written.
+written.
 ]]
 
-local para = ui.TextBox(text, { top = 1, left = 1, right = 1 })
+local para = ui.TextBox(text, { marginTop = 1, marginLeft = 1, marginRight = 1 })
 right:add(para)
 
-local footer = ui.Box({ height = 1, position = "bottom", bg = tb.BLACK })
+local footer = ui.Box({ height = 1, marginTop = "auto", bg = tb.BLACK })
 window:add(footer)
 
-local label = Label("Latest commits", { left = 1, right = 1, bg = tb.GREEN })
+local label = ui.Label("Latest commits", { marginLeft = 1, marginRight = 1, bg = tb.GREEN })
 left:add(label)
 
 ---------------------------
@@ -109,7 +112,7 @@ end
 
 max_commits = 1000
 
-local commits = ui.OptionList({}, { count = max_commits, top = 1, left = 1, right = 1 })
+local commits = ui.OptionList({}, { count = max_commits, marginTop = 1, marginLeft = 1, marginRight = 1 })
 left:add(commits)
 
 cache = {}

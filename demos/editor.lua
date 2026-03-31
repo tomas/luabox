@@ -22,13 +22,14 @@ function init()
   window:add(header)
   header:add(ui.Label("Editor"))
 
-  footer = ui.Box({ height = 1, vertical_pos = "bottom", bg = tb.BLACK })
+  editor = ui.EditableTextBox("", { fg = tb.LIGHT_GREY, focus_fg = tb.WHITE, flexGrow = 1 })
+  window:add(editor)
+
+  footer = ui.Box({ height = 1, marginTop = "auto", bg = tb.BLACK })
   window:add(footer)
   footer.label = ui.Label("", { width = "auto" })
   footer:add(footer.label)
 
-  editor = ui.EditableTextBox("", { fg = tb.LIGHT_GREY, focus_fg = tb.WHITE, top = 2, bottom = 1 })
-  window:add(editor)
 end
 
 function open(file)

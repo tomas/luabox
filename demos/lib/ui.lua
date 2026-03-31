@@ -3,6 +3,8 @@ local time    = require('demos.lib.time')
 local Object  = require('demos.lib.classic')
 local Emitter = require('demos.lib.events')
 local ustring = require('demos.lib.ustring')
+package.path = package.path .. ";./lib/?.lua"
+local yoga    = require('yoga')
 
 local screen, window, stopped
 local box_count = 0
@@ -216,6 +218,12 @@ function Window:new(screen, opts)
   self.window_focused = true
   self.shown = true
 
+  self.node = yoga.Node.create()
+  self.node:setWidth(screen.width)
+  self.node:setHeight(screen.height)
+  self.node:setFlexDirection(yoga.FlexDirection.Column)
+  self.node:setAlignItems(yoga.Align.Stretch)
+
   self:on('mouse_event', function(x, y, evt, ...)
     for _, child in ipairs(self.children) do
       if child.shown and child:contains(x, y) then
@@ -254,12 +262,17 @@ function Window:add(child)
 
   child.parent = self
   table.insert(self.children, child)
+  self.node:insertChild(child.node, self.node:getChildCount())
   self:trigger('child_added', child)
   -- self:mark_changed()
   return child
 end
 
 function Window:render()
+  local pw, ph = self:size()
+  self.node:setWidth(pw)
+  self.node:setHeight(ph)
+  self.node:calculateLayout()
   for _, child in ipairs(self.children) do
     -- if child is current above item, skip rendering
     -- as it will be called after all elements have been drawn
@@ -321,14 +334,12 @@ function Box:new(opts)
   self.bg       = opts.bg
   self.focus_fg = opts.focus_fg
   self.focus_bg = opts.focus_bg
-  self.bg_char  = opts.bg_char or ' ' -- or 0x2573 -- 0x26EC -- 0x26F6 -- 0xFFEE -- 0x261B
+  self.bg_char  = opts.bg_char or ' '
 
-  self.vertical_pos   = opts.vertical_pos   -- top, center or bottom
-  self.horizontal_pos = opts.horizontal_pos -- left, center or right
-  self.height_floor   = opts.height_floor or false
-  self.width_floor    = opts.width_floor or false
-  self.top_floor      = opts.top_floor or false
-  self.left_floor     = opts.left_floor or false
+  self.height_floor = opts.height_floor or false
+  self.width_floor  = opts.width_floor or false
+  self.top_floor    = opts.top_floor or false
+  self.left_floor   = opts.left_floor or false
 
   self.changed  = true
   self.hidden   = opts.hidden or false
@@ -336,6 +347,9 @@ function Box:new(opts)
   self.parent   = nil
   self.children = {}
   self.emitter  = Emitter:new()
+
+  self.node = yoga.Node.create()
+  self:_syncStyle(opts)
 
   -- self:on('resized', function(new_w, new_h)
   --   self:mark_changed()
@@ -363,6 +377,227 @@ function Box:new(opts)
       end
     end
   end)
+end
+
+function Box:_syncStyle(opts)
+  local n = self.node
+
+  n:setFlexDirection(yoga.FlexDirection.Column)
+  n:setAlignItems(yoga.Align.Stretch)
+  n:setJustifyContent(yoga.Justify.FlexStart)
+
+  if opts.flexDirection == "row" then
+    n:setFlexDirection(yoga.FlexDirection.Row)
+  elseif opts.flexDirection == "row-reverse" then
+    n:setFlexDirection(yoga.FlexDirection.RowReverse)
+  elseif opts.flexDirection == "column-reverse" then
+    n:setFlexDirection(yoga.FlexDirection.ColumnReverse)
+  end
+
+  if opts.justifyContent then
+    if opts.justifyContent == "flex-start" then
+      n:setJustifyContent(yoga.Justify.FlexStart)
+    elseif opts.justifyContent == "center" then
+      n:setJustifyContent(yoga.Justify.Center)
+    elseif opts.justifyContent == "flex-end" then
+      n:setJustifyContent(yoga.Justify.FlexEnd)
+    elseif opts.justifyContent == "space-between" then
+      n:setJustifyContent(yoga.Justify.SpaceBetween)
+    elseif opts.justifyContent == "space-around" then
+      n:setJustifyContent(yoga.Justify.SpaceAround)
+    elseif opts.justifyContent == "space-evenly" then
+      n:setJustifyContent(yoga.Justify.SpaceEvenly)
+    end
+  end
+
+  if opts.alignItems then
+    if opts.alignItems == "flex-start" then
+      n:setAlignItems(yoga.Align.FlexStart)
+    elseif opts.alignItems == "center" then
+      n:setAlignItems(yoga.Align.Center)
+    elseif opts.alignItems == "flex-end" then
+      n:setAlignItems(yoga.Align.FlexEnd)
+    elseif opts.alignItems == "stretch" then
+      n:setAlignItems(yoga.Align.Stretch)
+    elseif opts.alignItems == "baseline" then
+      n:setAlignItems(yoga.Align.Baseline)
+    end
+  end
+
+  if opts.alignSelf then
+    if opts.alignSelf == "flex-start" then
+      n:setAlignSelf(yoga.Align.FlexStart)
+    elseif opts.alignSelf == "center" then
+      n:setAlignSelf(yoga.Align.Center)
+    elseif opts.alignSelf == "flex-end" then
+      n:setAlignSelf(yoga.Align.FlexEnd)
+    elseif opts.alignSelf == "stretch" then
+      n:setAlignSelf(yoga.Align.Stretch)
+    elseif opts.alignSelf == "auto" then
+      n:setAlignSelf(yoga.Align.Auto)
+    end
+  end
+
+  if opts.gap then
+    n:setGap(yoga.Gutter.All, opts.gap)
+  end
+
+  if opts.display == "none" then
+    n:setDisplay(yoga.Display.None)
+  end
+
+  if opts.width then
+    if opts.width == "auto" then
+      -- auto width: don't set explicit width
+    elseif type(opts.width) == "string" and opts.width:match("%%$") then
+      local pct = tonumber(opts.width:match("(%d+)"))
+      n:setWidthPercent(pct)
+    elseif type(opts.width) == "number" and opts.width >= 1 then
+      n:setWidth(opts.width)
+    elseif type(opts.width) == "number" then
+      n:setWidthPercent(opts.width * 100)
+    end
+  end
+
+  if opts.height then
+    if type(opts.height) == "string" and opts.height:match("%%$") then
+      local pct = tonumber(opts.height:match("(%d+)"))
+      n:setHeightPercent(pct)
+    elseif type(opts.height) == "number" and opts.height >= 1 then
+      n:setHeight(opts.height)
+    elseif type(opts.height) == "number" then
+      n:setHeightPercent(opts.height * 100)
+    end
+  end
+
+  if opts.flexGrow then
+    n:setFlexGrow(opts.flexGrow)
+  end
+
+  if opts.flexShrink then
+    n:setFlexShrink(opts.flexShrink)
+  end
+
+  if opts.flexBasis then
+    if opts.flexBasis == "auto" then
+      n:setFlexBasisAuto()
+    elseif type(opts.flexBasis) == "string" and opts.flexBasis:match("%%$") then
+      local pct = tonumber(opts.flexBasis:match("(%d+)"))
+      n:setFlexBasisPercent(pct)
+    else
+      n:setFlexBasis(opts.flexBasis)
+    end
+  end
+
+  if opts.flexWrap then
+    if opts.flexWrap == "wrap" then
+      n:setFlexWrap(yoga.Wrap.Wrap)
+    elseif opts.flexWrap == "wrap-reverse" then
+      n:setFlexWrap(yoga.Wrap.WrapReverse)
+    end
+  end
+
+  if opts.minWidth then
+    if type(opts.minWidth) == "number" and opts.minWidth >= 1 then
+      n:setMinWidth(opts.minWidth)
+    elseif type(opts.minWidth) == "number" then
+      n:setMinWidthPercent(opts.minWidth * 100)
+    end
+  end
+
+  if opts.maxWidth then
+    if type(opts.maxWidth) == "number" and opts.maxWidth >= 1 then
+      n:setMaxWidth(opts.maxWidth)
+    elseif type(opts.maxWidth) == "number" then
+      n:setMaxWidthPercent(opts.maxWidth * 100)
+    end
+  end
+
+  if opts.minHeight then
+    if type(opts.minHeight) == "number" and opts.minHeight >= 1 then
+      n:setMinHeight(opts.minHeight)
+    elseif type(opts.minHeight) == "number" then
+      n:setMinHeightPercent(opts.minHeight * 100)
+    end
+  end
+
+  if opts.maxHeight then
+    if type(opts.maxHeight) == "number" and opts.maxHeight >= 1 then
+      n:setMaxHeight(opts.maxHeight)
+    elseif type(opts.maxHeight) == "number" then
+      n:setMaxHeightPercent(opts.maxHeight * 100)
+    end
+  end
+
+  local function setMargin(edge, val)
+    if not val or val == 0 then return end
+    if val == "auto" then
+      n:setMarginAuto(edge)
+    elseif type(val) == "string" and val:match("%%$") then
+      local pct = tonumber(val:match("(%d+)"))
+      n:setMarginPercent(edge, pct)
+    elseif type(val) == "number" and val < 1 then
+      n:setMarginPercent(edge, val * 100)
+    elseif type(val) == "number" then
+      n:setMargin(edge, val)
+    end
+  end
+
+  local function setPadding(edge, val)
+    if not val or val == 0 then return end
+    if type(val) == "string" and val:match("%%$") then
+      local pct = tonumber(val:match("(%d+)"))
+      n:setPaddingPercent(edge, pct)
+    elseif type(val) == "number" and val < 1 then
+      n:setPaddingPercent(edge, val * 100)
+    elseif type(val) == "number" then
+      n:setPadding(edge, val)
+    end
+  end
+
+  local function setPosition(edge, val)
+    if not val or val == 0 then return end
+    if type(val) == "string" and val:match("%%$") then
+      local pct = tonumber(val:match("(%d+)"))
+      n:setPositionPercent(edge, pct)
+    elseif type(val) == "number" and val < 1 then
+      n:setPositionPercent(edge, val * 100)
+    elseif type(val) == "number" then
+      n:setPosition(edge, val)
+    end
+  end
+
+  local function setBorder(edge, val)
+    if not val or val == 0 then return end
+    n:setBorder(edge, val)
+  end
+
+  setMargin(yoga.Edge.Left, opts.marginLeft)
+  setMargin(yoga.Edge.Right, opts.marginRight)
+  setMargin(yoga.Edge.Top, opts.marginTop)
+  setMargin(yoga.Edge.Bottom, opts.marginBottom)
+  setMargin(yoga.Edge.Horizontal, opts.marginX)
+  setMargin(yoga.Edge.Vertical, opts.marginY)
+  setMargin(yoga.Edge.All, opts.margin)
+
+  setPadding(yoga.Edge.Left, opts.paddingLeft)
+  setPadding(yoga.Edge.Right, opts.paddingRight)
+  setPadding(yoga.Edge.Top, opts.paddingTop)
+  setPadding(yoga.Edge.Bottom, opts.paddingBottom)
+  setPadding(yoga.Edge.Horizontal, opts.paddingX)
+  setPadding(yoga.Edge.Vertical, opts.paddingY)
+  setPadding(yoga.Edge.All, opts.padding)
+
+  setPosition(yoga.Edge.Left, opts.left)
+  setPosition(yoga.Edge.Right, opts.right)
+  setPosition(yoga.Edge.Top, opts.top)
+  setPosition(yoga.Edge.Bottom, opts.bottom)
+
+  setBorder(yoga.Edge.Left, opts.borderLeft)
+  setBorder(yoga.Edge.Right, opts.borderRight)
+  setBorder(yoga.Edge.Top, opts.borderTop)
+  setBorder(yoga.Edge.Bottom, opts.borderBottom)
+  setBorder(yoga.Edge.All, opts.border)
 end
 
 function Box:__tostring()
@@ -525,43 +760,23 @@ function Box:margin()
 end
 
 function Box:offset()
-  local x, y = self.parent:offset()
-  local top, right, bottom, left = self:margin()
-  local x_offset = self.left_floor and math.floor(x + left) or math.ceil(x + left)
-  local y_offset = self.top_floor and math.floor(y + top) or math.ceil(y + top)
-  return x_offset, y_offset
+  if not self.parent then return 0, 0 end
+  local px, py = self.parent:offset()
+  local l = self.node:getComputedLayout()
+  local x = self.left_floor and math.floor(px + l.left) or math.ceil(px + l.left)
+  local y = self.top_floor and math.floor(py + l.top) or math.ceil(py + l.top)
+  return x, y
 end
 
 function Box:size()
   if self.hidden then
     return 0, 0
   end
-
-  local w, h
-  local parent_w, parent_h = self.parent:size()
-  local top, right, bottom, left = self:margin()
-
-  if self.width then -- width of parent
-    w = self.width > 1 and self.width or parent_w * self.width
-    if self.right and self.right > 0 then
-      w = w - (self.right >= 1 and self.right or parent_w * self.right)
-    end
-  else -- width not set. parent width minus left/right margins
-    w = parent_w - (left + right)
-  end
-
-  if self.height then -- height of parent
-    h = self.height >= 1 and self.height or parent_h * self.height
-    if self.bottom and self.bottom > 0 then
-      h = h - (self.bottom >= 1 and self.bottom or parent_h * self.bottom)
-    end
-  else -- height not set. parent height minus top/bottom margins
-    h = parent_h - (top + bottom)
-  end
-
+  local l = self.node:getComputedLayout()
+  local w = l.width
+  local h = l.height
   if self.width_floor then w = math.floor(w) end
   if self.height_floor then h = math.floor(h) end
-
   return w, h
 end
 
@@ -585,6 +800,7 @@ function Box:add(child)
 
   child.parent = self
   table.insert(self.children, child)
+  self.node:insertChild(child.node, self.node:getChildCount())
   self:trigger('child_added', child)
   self:mark_changed()
   return child
@@ -727,6 +943,7 @@ function Drawing:set(str)
   end
 
   self.width = w
+  self.node:setHeight(self.height)
   self:mark_changed()
 end
 
@@ -737,6 +954,7 @@ function Drawing:render_self()
   local fg, bg = self:colors()
   local width, height = self:size()
   if width == 0 or height == 0 then return end
+  if not self.lines then return end
 
   -- local str = ustring.sub(self.text, 0, math.floor(width))
   for line = 0, height-1, 1 do
@@ -757,6 +975,7 @@ function Label:new(text, opts)
   if opts.width == 'auto' then
     self.auto_width = true -- so we resize when setting a bigger text
   end
+  self.node:setHeight(1)
   self:set_text(text)
 end
 
@@ -2104,14 +2323,23 @@ local function load(opts)
   assert(not window, "window already loaded")
 
   if not tb.init() then return end
-  if opts.mouse then tb.enable_mouse() end
-  tb.hide_cursor()
-  tb.enable_focus_tracking()
+  local termW, termH = tb.width(), tb.height()
+  if termW <= 0 or termH <= 0 then
+    tb.shutdown()
+    return
+  end
+  
+  if opts.mouse and tb.enable_mouse then tb.enable_mouse() end
+  if tb.hide_cursor then tb.hide_cursor() end
+  if tb.enable_focus_tracking then tb.enable_focus_tracking() end
+  if tb.render then tb.render() end
+  if tb.string then tb.string = tb.string end
+  if tb.char then tb.char = tb.char end
   start_blink_timer()
 
   screen = Container({
-    width = tb.width(),
-    height = tb.height()
+    width = termW,
+    height = termH
   })
 
   window = Window(screen, {
@@ -2270,12 +2498,12 @@ local function on_key(key, char, meta)
 end
 
 local mouse_events = {
-  [tb.KEY_MOUSE_LEFT]       = 'left_click',
-  [tb.KEY_MOUSE_MIDDLE]     = 'middle_click',
-  [tb.KEY_MOUSE_RIGHT]      = 'right_click',
+  [tb.KEY_MOUSE_LEFT or 0]       = 'left_click',
+  [tb.KEY_MOUSE_MIDDLE or 1]     = 'middle_click',
+  [tb.KEY_MOUSE_RIGHT or 2]      = 'right_click',
   -- [tb.KEY_MOUSE_RELEASE]    = 'mouseup',
-  [tb.KEY_MOUSE_WHEEL_UP]   = 'scroll_up',
-  [tb.KEY_MOUSE_WHEEL_DOWN] = 'scroll_down'
+  [tb.KEY_MOUSE_WHEEL_UP or 3]   = 'scroll_up',
+  [tb.KEY_MOUSE_WHEEL_DOWN or 4] = 'scroll_down'
 }
 
 local function on_click(key, x, y, count, is_motion, meta)
@@ -2386,20 +2614,17 @@ local function on_resize(w, h)
   end
 
   add_immediate_timer(function()
-    -- snapshot every box's current rect BEFORE updating screen size
     local old_rects = collect_rects(window)
 
-    -- apply new screen dimensions
     screen.width  = w
     screen.height = h
+    window.node:setWidth(w)
+    window.node:setHeight(h)
 
-    -- trigger 'resized' so widgets can update internal state (e.g. scroll limits)
     window:trigger('resized', w, h)
 
-    -- snapshot new rects now that layout has been recalculated
     local new_rects = collect_rects(window)
 
-    -- mark only the boxes whose geometry changed (or that overlap changed regions)
     mark_changed_rects(old_rects, new_rects)
   end, 'resize')
 end

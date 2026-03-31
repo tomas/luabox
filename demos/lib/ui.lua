@@ -542,7 +542,7 @@ function Box:size()
   local top, right, bottom, left = self:margin()
 
   if self.width then -- width of parent
-    w = self.width >= 1 and self.width or parent_w * self.width
+    w = self.width > 1 and self.width or parent_w * self.width
     if self.right and self.right > 0 then
       w = w - (self.right >= 1 and self.right or parent_w * self.right)
     end
@@ -1238,6 +1238,8 @@ local List = Box:extend()
 function List:new(items, opts)
   List.super.new(self, opts or {})
 
+  self.align_right = opts.align_right or false
+
   self.ypos = 1
   self.selected = 0
   self.items = items or {}
@@ -1478,7 +1480,7 @@ function List:render_self()
   local index, item, formatted, diff, skip_render
   local h = self.height_floor and math.floor(height) or math.ceil(height)
 
-  local align_right = self.horizontal_pos == 'right'
+  -- local align_right = self.horizontal_pos == 'right'
 
   for line = 0, h - 1, 1 do
     index = line + self.ypos
@@ -1508,7 +1510,7 @@ function List:render_self()
         diff = 0
       end
 
-      self:render_item(final, align_right and (x + diff) or x, y + line, self:item_fg_color(index, item, fg), self:item_bg_color(index, item, bg))
+      self:render_item(final, self.align_right and (x + diff) or x, y + line, self:item_fg_color(index, item, fg), self:item_bg_color(index, item, bg))
     end
   end
 

@@ -1002,6 +1002,9 @@ local function resolveChildAlign(parent, child)
 end
 
 local function calculateBaseline(node)
+    if node.measureFunc and #node.children == 0 then
+        return node.layout.height
+    end
     local baselineChild = nil
     for _, c in ipairs(node.children) do
         if c._lineIndex > 0 then break end
@@ -1714,10 +1717,14 @@ function layoutNode(node, availableWidth, availableHeight, widthMode, heightMode
             local maxAscent = 0
             local maxDescent = 0
             for _, c in ipairs(line) do
-                if resolveChildAlign(node, c) == Align.Baseline then
+                local childAlign = resolveChildAlign(node, c)
+                if childAlign == Align.Baseline then
                     local mTop = resolveEdge(c.style.margin, EDGE_TOP, ownerW)
                     local mBot = resolveEdge(c.style.margin, EDGE_BOTTOM, ownerW)
-                    local ascent = calculateBaseline(c) + mTop
+                    if not isDefined(mTop) then mTop = 0 end
+                    if not isDefined(mBot) then mBot = 0 end
+                    local baseline = calculateBaseline(c)
+                    local ascent = baseline + mTop
                     local descent = c.layout.height + mTop + mBot - ascent
                     if ascent > maxAscent then maxAscent = ascent end
                     if descent > maxDescent then maxDescent = descent end

@@ -692,7 +692,37 @@ function StyledBox:render_self()
 
   tb.char(offset_x, h + offset_y, tb.LIGHT_GREEN, parent_bg, '╹')
 
-  for x = 1, math.floor(width - 1), 1 do
+  for x = 1, math.ceil(width - 1), 1 do
+    tb.char(x + offset_x, h + offset_y, bg, parent_bg, '▀')
+  end
+end
+
+local RoundedBox = Box:extend()
+
+function RoundedBox:render_self()
+  RoundedBox.super.render_self(self)
+
+  local offset_x, offset_y = self:offset()
+  local width, height = self:size()
+  local fg, bg = self:colors()
+  local rounded_width = self.width_floor and math.floor(width) or math.ceil(width)
+  local parent_fg, parent_bg = self.parent:colors()
+  local h = self.height_floor and math.floor(height) or math.ceil(height)
+  local w = self.width_floor and math.floor(width) or math.ceil(width)
+
+  for x = 1, w - 1, 1 do
+    tb.char(x + offset_x, offset_y - 1, bg, parent_bg, '▄')
+  end
+
+  tb.char(offset_x, offset_y - 1, tb.bold(bg), parent_bg, '▗') -- top left
+  tb.char(offset_x + w, offset_y - 1, tb.bold(bg), parent_bg, '▖') -- top right
+  tb.char(offset_x, offset_y, bg, parent_bg, '▐')
+  tb.char(offset_x + w, offset_y, bg, parent_bg, '▌')
+
+  tb.char(offset_x, offset_y + h, tb.bold(bg), parent_bg, '▝') -- bottom left
+  tb.char(offset_x + w, offset_y + h, tb.bold(bg), parent_bg, '▘') -- bottom right
+
+  for x = 1, w - 1, 1 do
     tb.char(x + offset_x, h + offset_y, bg, parent_bg, '▀')
   end
 end
@@ -752,6 +782,7 @@ local Label = Box:extend()
 function Label:new(text, opts)
   local opts = opts or {}
   Label.super.new(self, opts)
+  self.bold = opts.bold
 
   self.height = 1
   if opts.width == 'auto' then
@@ -770,6 +801,14 @@ function Label:set_text(text)
   end
   self.text = text
   self:mark_changed()
+end
+
+function Label:colors()
+  local fg, bg = Label.super.colors(self)
+  if self.bold then
+    fg = tb.bold(fg)
+  end
+  return fg, bg
 end
 
 function Label:render_self()
@@ -2479,6 +2518,7 @@ ui.cancel = remove_timer
 
 ui.Box        = Box
 ui.StyledBox  = StyledBox
+ui.RoundedBox  = RoundedBox
 ui.Drawing    = Drawing
 ui.Label      = Label
 ui.TextBox    = TextBox

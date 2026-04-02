@@ -359,6 +359,12 @@ static int l_tb_rgb(lua_State *L) {
   return 1;
 }
 
+static int l_tb_rgb_from_xterm(lua_State *L) {
+  uint8_t col = luaL_checkunsigned(L, 1);
+  lua_pushinteger(L, tb_rgb_from_xterm(col));
+  return 1;
+}
+
 static int l_tb_bold(lua_State *L) {
   uint16_t col = luaL_checkunsigned(L, 1);
   lua_pushinteger(L, col | TB_BOLD);
@@ -383,6 +389,7 @@ static const struct luaL_Reg l_luabox[] = {
   {"resize",                 l_tb_resize},
   {"render",                 l_tb_render},
   {"rgb",                    l_tb_rgb},
+  {"rgb_from_xterm",         l_tb_rgb_from_xterm},
   {"bold",                   l_tb_bold},
   {"underline",              l_tb_underline},
   {"cell",                   l_tb_cell},

@@ -2292,11 +2292,18 @@ local function load(opts)
 end
 
 local function unload()
+  if not screen then return end
+
+  stopped = true
   stop_blink_timer()
+
   if window then
     window:remove()
     window = nil
   end
+
+  screen = nil
+
   -- tb.show_cursor()
   tb.shutdown()
 end

@@ -1430,8 +1430,12 @@ function List:fix_encoding(str)
   end
 end
 
+function List:is_selected(index)
+  return index == self.selected
+end
+
 function List:item_fg_color(index, item, default_color)
-  if index == self.selected then
+  if self:is_selected(index) then
     return self:is_focused() and self.focus_selection_fg or self.selection_fg or default_color
   else
     return default_color
@@ -1439,7 +1443,7 @@ function List:item_fg_color(index, item, default_color)
 end
 
 function List:item_bg_color(index, item, default_color)
-  if index == self.selected then
+  if self:is_selected(index) then
     return self:is_focused() and self.focus_selection_bg or self.selection_bg or default_color
   else
     return default_color
@@ -1510,7 +1514,7 @@ function List:render_self()
         diff = 0
       end
 
-      self:render_item(final, self.align_right and (x + diff) or x, y + line, self:item_fg_color(index, item, fg), self:item_bg_color(index, item, bg))
+      self:render_item(final, self.align_right and (x + diff) or x, y + line, self:item_fg_color(index, item, fg), self:item_bg_color(index, item, bg), self:is_selected(index))
     end
   end
 
@@ -2076,25 +2080,33 @@ function MultiOptionList:multi_submit()
   end
 end
 
-function MultiOptionList:item_fg_color(index, item, default_color)
-  if index == self.selected then
-    return MultiOptionList.super.item_fg_color(self, index, item, default_color)
+function MultiOptionList:is_selected(index)
+  if index == self.selected or self.multi_selected[index] then
+    return true
   end
-  if self.multi_selected[index] then
-    return self.multi_sel_fg or default_color
-  end
-  return default_color
+
+  return false
 end
 
-function MultiOptionList:item_bg_color(index, item, default_color)
-  if index == self.selected then
-    return MultiOptionList.super.item_bg_color(self, index, item, default_color)
-  end
-  if self.multi_selected[index] then
-    return self.multi_sel_bg or default_color
-  end
-  return default_color
-end
+-- function MultiOptionList:item_fg_color(index, item, default_color)
+--   if index == self.selected then
+--     return MultiOptionList.super.item_fg_color(self, index, item, default_color)
+--   end
+--   if self.multi_selected[index] then
+--     return self.multi_sel_fg or default_color
+--   end
+--   return default_color
+-- end
+
+-- function MultiOptionList:item_bg_color(index, item, default_color)
+--   if index == self.selected then
+--     return MultiOptionList.super.item_bg_color(self, index, item, default_color)
+--   end
+--   if self.multi_selected[index] then
+--     return self.multi_sel_bg or default_color
+--   end
+--   return default_color
+-- end
 
 -----------------------------------------
 -- load/unload UI

@@ -1469,6 +1469,14 @@ function List:fix_encoding(str)
   end
 end
 
+function List:get_line_length(str)
+  return str and ustring.len(str) or 0
+end
+
+function List:slice_line(str, end_char)
+  return ustring.sub(str, 0, end_char)
+end
+
 function List:is_selected(index)
   return index == self.selected
 end
@@ -1544,16 +1552,16 @@ function List:render_self()
 
       formatted = self:format_item(item)
       final     = self:fix_encoding(formatted)
-      diff      = width - ustring.len(final)
+      diff      = width - self:get_line_length(final)
 
       if diff >= 0 then -- line is shorter than width
         final = final -- .. string.rep(' ', diff)
       else -- line is longer, so cut!
-        final = ustring.sub(final, 0, rounded_width-1) .. '…'
+        final = self:slice_line(final, rounded_width-1) .. '…'
         diff = 0
       end
 
-      self:render_item(final, self.align_right and (x + diff) or x, y + line, self:item_fg_color(index, item, fg), self:item_bg_color(index, item, bg), self:is_selected(index))
+      self:render_item(final, self.align_right and (x + diff) or x, y + line, self:item_fg_color(index, item, fg), self:item_bg_color(index, item, bg), self:is_selected(index), rounded_width-1)
     end
   end
 
@@ -2494,7 +2502,7 @@ local function start()
 
     elseif res == tb.EVENT_FOCUS then
       local is_focused = ev.key == 1
-      toggle_blink_timer(is_focused)
+      -- toggle_blink_timer(is_focused)
       window:set_focused(is_focused)
 
     elseif res == tb.EVENT_RESIZE then

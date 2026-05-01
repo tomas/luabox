@@ -2355,32 +2355,35 @@ local function on_click(key, x, y, count, is_motion, meta)
   -- -- stash raw mouse meta on window so widgets (e.g. MultiOptionList) can read it
   -- if window then window.last_mouse_meta = raw_meta or 0 end
 
+  local target = window
+
   if window.above_item then
+    target = window.above_item
     if window.above_item:contains(x, y) then
       window.above_item:trigger(event, x, y)
       window.above_item:trigger('mouse_event', x, y, event, meta)
     else
       window:hide_above()
+      return -- we don't want to propagate
     end
-    return -- we don't want to propagate
   end
 
-  window:trigger('mouse_event', x, y, event, meta)
+  target:trigger('mouse_event', x, y, event, meta)
 
   if event:match('_click') then
     -- trigger a 'click' event for all mouse clicks, regardless of button
-    window:trigger('mouse_event', x, y, 'click', meta)
+    target:trigger('mouse_event', x, y, 'click', meta)
 
     if count > 0 and count % 2 == 0 then -- four clicks in a row should count as 2 x double-click
-      window:trigger('mouse_event', x, y, 'double_click', meta)
+      target:trigger('mouse_event', x, y, 'double_click', meta)
     elseif count > 0 and count % 3 == 0 then -- same as above, but x3
-      window:trigger('mouse_event', x, y, 'triple_click', meta)
+      target:trigger('mouse_event', x, y, 'triple_click', meta)
     end
 
   elseif event:match('scroll_') then
     -- trigger a 'scroll' event for up/down
     local dir = key == tb.KEY_MOUSE_WHEEL_UP and -5 or 5
-    window:trigger('mouse_event', x, y, 'scroll', dir, raw_meta)
+    target:trigger('mouse_event', x, y, 'scroll', dir, raw_meta)
   end
 
 end

@@ -370,6 +370,15 @@ function Box:__tostring()
   return string.format("<Box [w:%d,h:%d] [x:%d/y:%d] [fg:%d,bg:%d]>", w, h, self.x, self.y, self.width or -1, self.height or -1, self.fg or -1, self.bg or -1)
 end
 
+function Box:set_position(top, right, bottom, left)
+  if top then self.top = top end
+  if bottom then self.bottom = bottom end
+  if right then self.right = right end
+  if left then self.left = left end
+  self:trigger('resized')
+  -- return self:mark_changed()
+end
+
 function Box:set_width(val)
   self.width = val
   self:trigger('resized')

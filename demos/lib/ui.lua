@@ -1984,6 +1984,325 @@ function SmartMenu:filter_options(str)
 end
 
 -----------------------------------------
+-- Checkbox
+
+local Checkbox = Box:extend()
+
+function Checkbox:new(text, opts)
+  local opts = opts or {}
+  Checkbox.super.new(self, opts)
+
+  self.text = text or ''
+  self.checked = opts.checked or false
+  self.bg = opts.bg
+  self.fg = opts.fg
+  self.check_fg = opts.check_fg or tb.WHITE
+  self.check_bg = opts.check_bg or tb.BLACK
+
+  self.height = 1
+  local width = opts.width or (4 + ustring.len(self.text)) -- [X] + space + text
+  self:set_width(width)
+
+  self:on('left_click', function()
+    self:toggle()
+  end)
+
+  self:on('key', function(key, ch, meta)
+    if key == tb.KEY_ENTER or ch == ' ' then
+      self:toggle()
+    end
+  end)
+end
+
+function Checkbox:toggle()
+  self.checked = not self.checked
+  self:mark_changed()
+  self:trigger('change', self.checked)
+end
+
+function Checkbox:set_checked(checked)
+  self.checked = checked
+  self:mark_changed()
+  self:trigger('change', self.checked)
+end
+
+function Checkbox:is_checked()
+  return self.checked
+end
+
+function Checkbox:render_self()
+  Checkbox.super.render_self(self)
+
+  local x, y = self:offset()
+  local fg = self.fg or tb.DEFAULT
+  local bg = self.bg or tb.DEFAULT
+  local width, height = self:size()
+  if width == 0 or height == 0 then return end
+
+  -- Draw checkbox bracket
+  local box_char = self.checked and 'X' or ' '
+  local box_fg = self.checked and self.check_fg or (self.fg or tb.DEFAULT)
+  local box_bg = self.checked and self.check_bg or (self.bg or tb.DEFAULT)
+
+  tb.string(x, y, box_fg, box_bg, '[' .. box_char .. ']')
+
+  -- Draw text
+  local text_start = x + 4
+  local text_str = ustring.sub(self.text, 0, math.max(0, width - 4))
+  if ustring.len(text_str) > 0 then
+    tb.string(text_start, y, fg, bg, text_str)
+  end
+end
+
+-----------------------------------------
+-- RadioButton
+
+local RadioButton = Box:extend()
+
+function RadioButton:new(text, opts)
+  local opts = opts or {}
+  RadioButton.super.new(self, opts)
+
+  self.text = text or ''
+  self.checked = opts.checked or false
+  self.bg = opts.bg
+  self.fg = opts.fg
+  self.check_fg = opts.check_fg or tb.WHITE
+  self.check_bg = opts.check_bg or tb.BLACK
+  self.group = opts.group or nil -- group name for mutual exclusion
+
+  self.height = 1
+  local width = opts.width or (4 + ustring.len(self.text)) -- (o) + space + text
+  self:set_width(width)
+
+  self:on('left_click', function()
+    self:select()
+  end)
+
+  self:on('key', function(key, ch, meta)
+    if key == tb.KEY_ENTER or ch == ' ' then
+      self:select()
+    end
+  end)
+end
+
+function RadioButton:select()
+  if self.checked then return end
+
+  self.checked = true
+  self:mark_changed()
+
+  -- If part of a group, uncheck others
+  if self.group then
+    local parent = self.parent
+    if parent then
+      for _, child in ipairs(parent.children or {}) do
+        if child ~= self and child.group == self.group and child.checked then
+          child.checked = false
+          child:mark_changed()
+        end
+      end
+    end
+  end
+
+  self:trigger('change', true)
+  self:trigger('selected', self)
+end
+
+function RadioButton:set_checked(checked)
+  if checked then
+    self:select()
+  else
+    self.checked = false
+    self:mark_changed()
+    self:trigger('change', false)
+  end
+end
+
+function RadioButton:is_checked()
+  return self.checked
+end
+
+function RadioButton:render_self()
+  RadioButton.super.render_self(self)
+
+  local x, y = self:offset()
+  local fg = self.fg or tb.DEFAULT
+  local bg = self.bg or tb.DEFAULT
+  local width, height = self:size()
+  if width == 0 or height == 0 then return end
+
+  -- Draw radio button parentheses
+  local inner_char = self.checked and '*' or ' '
+  local inner_fg = self.checked and self.check_fg or (self.fg or tb.DEFAULT)
+  local inner_bg = self.checked and self.check_bg or (self.bg or tb.DEFAULT)
+
+  tb.string(x, y, inner_fg, inner_bg, '(' .. inner_char .. ')')
+
+  -- Draw text
+  local text_start = x + 4
+  local text_str = ustring.sub(self.text, 0, math.max(0, width - 4))
+  if ustring.len(text_str) > 0 then
+    tb.string(text_start, y, fg, bg, text_str)
+  end
+end
+
+-----------------------------------------
+-- ComboBox (simple non-searchable dropdown)
+
+local ComboBox = Box:extend()
+
+function ComboBox:new(items, opts)
+  local default_placeholder = ' Choose '
+  local width = opts.width or (string.len(opts.placeholder or default_placeholder) + 2)
+
+  local box_opts = {
+    hidden = opts.hidden,
+    width = width,
+    top = opts.top or 0,
+    left = opts.left,
+    right = opts.right,
+    height = 1,
+    horizontal_pos = opts.horizontal_pos
+  }
+
+  ComboBox.super.new(self, box_opts)
+
+  self.original_items = items or {}
+  self.selected_index = 0
+  self.selected_value = nil
+  self.revealed = false
+
+  self.bg = opts.bg or tb.WHITE
+  self.fg = opts.fg or tb.BLACK
+  self.placeholder = opts.placeholder or default_placeholder
+  self.menu_bg = opts.menu_bg or tb.GREY
+  self.menu_fg = opts.menu_fg
+  self.menu_selection_fg = opts.menu_selection_fg
+  self.menu_selection_bg = opts.menu_selection_bg or self.menu_bg
+
+  -- Display label (acts as button)
+  self.display = Label(self.placeholder, {
+    width = width,
+    height = 1,
+    bg = self.bg,
+    fg = self.fg
+  })
+  self:add(self.display)
+
+  local menu_height = opts.height or 5
+  local menu_opts = {
+    horizontal_pos = opts.horizontal_pos,
+    min_width = width,
+    max_width = width * 2,
+    height = menu_height,
+    bg = self.menu_bg,
+    fg = self.menu_fg,
+    selection_fg = self.menu_selection_fg,
+    selection_bg = self.menu_selection_bg,
+    top = 1,
+  }
+
+  self.menu = Menu(self.original_items, menu_opts)
+  self.menu.hidden = true
+  self:add(self.menu)
+
+  self:on('left_click', function()
+    self:toggle()
+  end)
+
+  self.menu:on('hidden', function()
+    self:closed()
+  end)
+
+  self.menu:on('submit', function(number, value)
+    self:select_option(number, value)
+  end)
+end
+
+function ComboBox:size()
+  local w, h = ComboBox.super.size(self)
+  local menu_w, menu_h = self.menu:size()
+  return w, h + menu_h
+end
+
+function ComboBox:set_width(val)
+  ComboBox.super.set_width(self, val)
+  self.display:set_width(val)
+  self.menu.min_width = val
+end
+
+function ComboBox:set_height(val)
+  self.menu:set_height(val)
+end
+
+function ComboBox:toggle()
+  if self.revealed then
+    self:close()
+  else
+    self:reveal()
+  end
+end
+
+function ComboBox:reveal()
+  if self.revealed then return false end
+  self.revealed = true
+  self.menu:toggle(true)
+  self.menu:focus()
+  self:trigger('revealed')
+end
+
+function ComboBox:close()
+  if not self.revealed then return end
+  self.menu:toggle(false)
+end
+
+function ComboBox:closed()
+  self.revealed = false
+  self:trigger('closed')
+end
+
+function ComboBox:select_option(index, value)
+  self.selected_index = index
+  self.selected_value = value
+  self.display:set_text(value)
+  add_timer(50, function()
+    self:close()
+  end)
+  self:trigger('change', index, value)
+  self:trigger('selected', index, value)
+end
+
+function ComboBox:get_selected_index()
+  return self.selected_index
+end
+
+function ComboBox:get_selected_value()
+  return self.selected_value
+end
+
+function ComboBox:set_selected_index(index)
+  if index >= 1 and index <= #self.original_items then
+    self:select_option(index, self.original_items[index])
+  end
+end
+
+function ComboBox:set_items(items)
+  self.original_items = items
+  self.selected_index = 0
+  self.selected_value = nil
+  self.display:set_text(self.placeholder)
+  self.menu:set_items(items)
+end
+
+function ComboBox:reset()
+  self.selected_index = 0
+  self.selected_value = nil
+  self.display:set_text(self.placeholder)
+  self.menu:move_to(1, 1)
+end
+
+-----------------------------------------
 
 local MultiOptionList = OptionList:extend()
 
@@ -2561,5 +2880,8 @@ ui.OptionList = OptionList
 ui.MultiOptionList = MultiOptionList
 ui.Menu       = Menu
 ui.SmartMenu  = SmartMenu
+ui.Checkbox   = Checkbox
+ui.RadioButton = RadioButton
+ui.ComboBox   = ComboBox
 
 return ui

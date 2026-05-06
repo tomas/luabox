@@ -1152,6 +1152,11 @@ function EditableTextBox:delete_char(at)
 end
 
 function EditableTextBox:delete_last_word()
+  if self.cursor_pos > 0 and self:get_char_at_pos(self.cursor_pos - 1) == '\n' then
+    self:move_cursor_to_last('\n')
+    return
+  end
+
   local deleting = true
   while deleting do
     if self:delete_char(-1) == false or string.find(self:get_char_at_pos(self.cursor_pos), stopchars) == 1 then

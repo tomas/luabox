@@ -15,6 +15,10 @@ local cursor_blink_on   = true
 local cursor_blink_ms   = 500  -- toggle every 500 ms
 local cursor_blink_timer = nil
 
+-- Track whether termbox is initialized so load/unload transitions don't
+-- cycle init/shutdown (which can fail on some terminals).
+local tb_alive = false
+
 local function dump(o)
   if type(o) == 'table' then
     local s = '{ '
@@ -2495,7 +2499,12 @@ local function load(opts)
   local opts = opts or {}
   assert(not window, "window already loaded")
 
-  if not tb.init() then return end
+  if not tb_alive then
+    if not tb.init() then return end
+    tb_alive = true
+  end
+  tb.clear_buffer()
+  stopped = false
   if opts.mouse then tb.enable_mouse() end
   tb.hide_cursor()
   tb.enable_focus_tracking()
@@ -2632,21 +2641,24 @@ local function load(opts)
   return window
 end
 
-local function unload()
-  if not screen then return end
+local function unload(keep)
+  if screen then
+    stopped = true
+    stop_blink_timer()
 
-  stopped = true
-  stop_blink_timer()
+    if window then
+      window:remove()
+      window = nil
+    end
 
-  if window then
-    window:remove()
-    window = nil
+    screen = nil
   end
 
-  screen = nil
-
   -- tb.show_cursor()
-  tb.shutdown()
+  if not keep and tb_alive then
+    tb.shutdown()
+    tb_alive = false
+  end
 end
 
 -----------------------------------------

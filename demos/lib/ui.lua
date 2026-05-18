@@ -152,8 +152,10 @@ local function start_blink_timer()
   cursor_blink_timer = add_repeating_timer(cursor_blink_ms, function()
     if window and window.focused then
       cursor_blink_on = not cursor_blink_on
-      -- mark only the focused widget as changed so it redraws the cursor cell
-      window.focused:mark_changed()
+      -- Only mark widgets that actually render a cursor (EditableTextBox subclasses)
+      if window.focused.render_cursor then
+        window.focused:mark_changed()
+      end
     end
   end, 'cursor_blink')
 end
@@ -657,6 +659,10 @@ function Box:render()
       -- errwrite('changed! ' .. self.id)
       self:render_self()
       self:rendered()
+      -- render_self() cleared our area, so children must redraw too
+      for _, child in ipairs(self.children) do
+        child:mark_changed()
+      end
     end
     self:render_tree()
   end
@@ -2004,6 +2010,7 @@ function Checkbox:new(text, opts)
   self.check_bg = opts.check_bg or tb.BLACK
 
   self.height = 1
+  self:mark_changed()
   local width = opts.width or (4 + ustring.len(self.text)) -- [X] + space + text
   self:set_width(width)
 
@@ -2076,6 +2083,7 @@ function RadioButton:new(text, opts)
   self.group = opts.group or nil -- group name for mutual exclusion
 
   self.height = 1
+  self:mark_changed()
   local width = opts.width or (4 + ustring.len(self.text)) -- (o) + space + text
   self:set_width(width)
 
@@ -2706,7 +2714,6 @@ local function on_click(key, x, y, count, is_motion, meta)
     target = window.above_item
     if window.above_item:contains(x, y) then
       window.above_item:trigger(event, x, y)
-      window.above_item:trigger('mouse_event', x, y, event, meta)
     else
       window:hide_above()
       return -- we don't want to propagate

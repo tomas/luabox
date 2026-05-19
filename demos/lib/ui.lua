@@ -1002,8 +1002,12 @@ function EditableTextBox:get_text()
 end
 
 function EditableTextBox:handle_key(key, meta)
-  if key == tb.KEY_ENTER and meta == 0 then
-    self:handle_enter()
+  if key == tb.KEY_ENTER or key == tb.KEY_SHIFT_ENTER then
+    if key == tb.KEY_SHIFT_ENTER then
+      self:handle_enter(tb.META_SHIFT)
+    else
+      self:handle_enter(meta)
+    end
   elseif key == tb.KEY_BACKSPACE or key == tb.KEY_CTRL_BACKSPACE then
     if meta == tb.META_ALT or key == tb.KEY_CTRL_BACKSPACE then
       self:delete_last_word()
@@ -1122,7 +1126,7 @@ function EditableTextBox:move_cursor_to_next(char, insert_after)
   self.cursor_pos = nextpos and (nextpos + offset) or self.chars
 end
 
-function EditableTextBox:handle_enter()
+function EditableTextBox:handle_enter(meta)
   self:append_char('\n')
   self:maybe_move_cursor_down()
 end
@@ -1271,7 +1275,7 @@ function TextInput:new(opts)
   self.placeholder = opts.placeholder
 end
 
-function TextInput:handle_enter()
+function TextInput:handle_enter(meta)
   self:trigger('submit', self.text)
 end
 

@@ -531,6 +531,7 @@ int luaopen_luabox(lua_State *L) {
   lua_pushnumber(L, TB_KEY_TAB              ); lua_setfield(L, -2, "KEY_TAB");
   lua_pushnumber(L, TB_KEY_CTRL_I           ); lua_setfield(L, -2, "KEY_CTRL_I");
   lua_pushnumber(L, TB_KEY_CTRL_J           ); lua_setfield(L, -2, "KEY_CTRL_J");
+  lua_pushnumber(L, TB_KEY_SHIFT_ENTER      ); lua_setfield(L, -2, "KEY_SHIFT_ENTER");
   lua_pushnumber(L, TB_KEY_CTRL_K           ); lua_setfield(L, -2, "KEY_CTRL_K");
   lua_pushnumber(L, TB_KEY_CTRL_L           ); lua_setfield(L, -2, "KEY_CTRL_L");
   lua_pushnumber(L, TB_KEY_ENTER            ); lua_setfield(L, -2, "KEY_ENTER");

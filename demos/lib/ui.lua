@@ -1214,7 +1214,7 @@ function EditableTextBox:handle_key(key, meta)
       self.selection_anchor = nil
     end
     if meta == tb.META_CTRL or meta == tb.META_CTRLSHIFT then
-      self:move_cursor_word_left()
+      self:move_cursor_word(-1)
     else
       self:move_cursor_left()
     end
@@ -1225,7 +1225,7 @@ function EditableTextBox:handle_key(key, meta)
       self.selection_anchor = nil
     end
     if meta == tb.META_CTRL or meta == tb.META_CTRLSHIFT then
-      self:move_cursor_word_right()
+      self:move_cursor_word(1)
     else
       self:move_cursor_right()
     end
@@ -1235,21 +1235,21 @@ function EditableTextBox:handle_key(key, meta)
     else
       self.selection_anchor = nil
     end
-    self:move_cursor_down()
+    self:move_cursor_vertically(1)
   elseif key == tb.KEY_ARROW_UP then
     if meta == tb.META_SHIFT then
       self.selection_anchor = self.selection_anchor or self.cursor_pos
     else
       self.selection_anchor = nil
     end
-    self:move_cursor_up()
+    self:move_cursor_vertically(-1)
   elseif key == tb.KEY_PAGE_UP then
     if meta == tb.META_SHIFT then
       self.selection_anchor = self.selection_anchor or self.cursor_pos
     else
       self.selection_anchor = nil
     end
-    self:move_cursor_page_up()
+    self:move_cursor_page(-1)
     self:ensure_cursor_visible()
   elseif key == tb.KEY_PAGE_DOWN then
     if meta == tb.META_SHIFT then
@@ -1257,7 +1257,7 @@ function EditableTextBox:handle_key(key, meta)
     else
       self.selection_anchor = nil
     end
-    self:move_cursor_page_down()
+    self:move_cursor_page(1)
     self:ensure_cursor_visible()
   end
 end
@@ -1320,86 +1320,66 @@ function EditableTextBox:move_cursor_right()
   return self:move_cursor(1)
 end
 
-function EditableTextBox:maybe_move_cursor_up()
-  local cursor_x, cursor_y = self:get_cursor_offset()
-  if cursor_y == 0 and self.ypos > 0 then
-    self:move(-1)
-    return true
+function EditableTextBox:maybe_move_cursor(dir)
+  local width, height = self:size()
+  local _, cursor_y = self:get_cursor_offset()
+
+  if dir < 0 then
+    if cursor_y == 0 and self.ypos > 0 then
+      self:move(-1)
+      return true
+    end
+  else
+    if cursor_y >= height - 1 and self.nlines > height then
+      self:move(1)
+      return true
+    end
   end
   return false
 end
 
-function EditableTextBox:move_cursor_up()
-  local width = math.floor(self:size())
+function EditableTextBox:move_cursor_vertically(dir)
+  local width, height = self:size()
+  width = math.floor(width)
 
   local cursor_x, cursor_y = self:get_cursor_offset(width)
 
-  if cursor_y <= 0 then
-    if self.ypos > 0 then
-      self:maybe_move_cursor_up()
-      cursor_x, cursor_y = self:get_cursor_offset(width)
-    else
-      return
+  if dir < 0 then
+    if cursor_y <= 0 then
+      if self.ypos > 0 then
+        self:move(-1)
+        cursor_x, cursor_y = self:get_cursor_offset(width)
+      else
+        return
+      end
+    end
+  else
+    if cursor_y >= height - 1 then
+      if self.nlines > height then
+        self:move(1)
+        cursor_x, cursor_y = self:get_cursor_offset(width)
+      else
+        return
+      end
     end
   end
 
   local abs_line = cursor_y + self:get_ypos()
-  if abs_line <= 0 then return end
+  if dir < 0 and abs_line <= 0 then return end
 
-  self.cursor_pos = self:pos_from_visual(cursor_x, abs_line - 1, width)
+  self.cursor_pos = self:pos_from_visual(cursor_x, abs_line + dir, width)
 end
 
-function EditableTextBox:maybe_move_cursor_down()
-  local width, height = self:size()
-  local cursor_x, cursor_y = self:get_cursor_offset()
-
-  if cursor_y >= height - 1 and self.nlines > height then
-    self:move(1)
-    return true
-  end
-  return false
-end
-
-function EditableTextBox:move_cursor_down()
+function EditableTextBox:move_cursor_page(dir)
   local width, height = self:size()
   width = math.floor(width)
-
-  local cursor_x, cursor_y = self:get_cursor_offset(width)
-
-  if cursor_y >= height - 1 then
-    if self:maybe_move_cursor_down() then
-      cursor_x, cursor_y = self:get_cursor_offset(width)
-    else
-      return
-    end
-  end
-
-  local abs_line = cursor_y + self:get_ypos()
-  self.cursor_pos = self:pos_from_visual(cursor_x, abs_line + 1, width)
-end
-
-function EditableTextBox:move_cursor_page_up()
-  local width, height = self:size()
-  width = math.floor(width)
-  height = math.floor(height)
   local page = math.max(1, math.floor(height / 2))
 
   local cursor_x, cursor_y = self:get_cursor_offset(width)
-  local abs_line = cursor_y + self:get_ypos()
-  local target_line = math.max(0, abs_line - page)
-
-  self.cursor_pos = self:pos_from_visual(cursor_x, target_line, width)
-end
-
-function EditableTextBox:move_cursor_page_down()
-  local width, height = self:size()
-  width = math.floor(width)
-  height = math.floor(height)
-  local page = math.max(1, math.floor(height / 2))
-
-  local cursor_x, cursor_y = self:get_cursor_offset(width)
-  local abs_line = cursor_y + self:get_ypos()
-  local target_line = abs_line + page
+  local target_line = cursor_y + self:get_ypos() + (dir * page)
+  if dir < 0 then
+    target_line = math.max(0, target_line)
+  end
 
   self.cursor_pos = self:pos_from_visual(cursor_x, target_line, width)
 end
@@ -1434,16 +1414,14 @@ function EditableTextBox:save_undo()
   end
 end
 
-function EditableTextBox:undo()
-  if not self.undo_stack or #self.undo_stack == 0 then return end
-  self.redo_stack = self.redo_stack or {}
-  table.insert(self.redo_stack, {
+function EditableTextBox:_swap_state(pop_stack, push_stack)
+  table.insert(push_stack, {
     text = self.text,
     chars = self.chars,
     cursor_pos = self.cursor_pos,
     selection_anchor = self.selection_anchor,
   })
-  local state = table.remove(self.undo_stack)
+  local state = table.remove(pop_stack)
   self.text = state.text
   self.chars = state.chars
   self.cursor_pos = state.cursor_pos
@@ -1451,20 +1429,15 @@ function EditableTextBox:undo()
   self:mark_changed()
 end
 
+function EditableTextBox:undo()
+  if not self.undo_stack or #self.undo_stack == 0 then return end
+  self.redo_stack = self.redo_stack or {}
+  self:_swap_state(self.undo_stack, self.redo_stack)
+end
+
 function EditableTextBox:redo()
   if not self.redo_stack or #self.redo_stack == 0 then return end
-  table.insert(self.undo_stack, {
-    text = self.text,
-    chars = self.chars,
-    cursor_pos = self.cursor_pos,
-    selection_anchor = self.selection_anchor,
-  })
-  local state = table.remove(self.redo_stack)
-  self.text = state.text
-  self.chars = state.chars
-  self.cursor_pos = state.cursor_pos
-  self.selection_anchor = state.selection_anchor
-  self:mark_changed()
+  self:_swap_state(self.redo_stack, self.undo_stack)
 end
 
 function EditableTextBox:move_cursor_to_beginning()
@@ -1513,44 +1486,44 @@ function EditableTextBox:move_cursor_to_next(char, insert_after)
   self.cursor_pos = nextpos and (nextpos + offset) or self.chars
 end
 
-function EditableTextBox:move_cursor_word_left()
-  if self.cursor_pos == 0 then return end
-  if self:get_char_at_pos(self.cursor_pos) == '\n' then
-    self.cursor_pos = self.cursor_pos - 1
-    return
-  end
-  while self.cursor_pos > 0
-      and self:get_char_at_pos(self.cursor_pos) ~= '\n'
-      and stopchars[self:get_char_at_pos(self.cursor_pos)] do
-    self.cursor_pos = self.cursor_pos - 1
-  end
-  while self.cursor_pos > 0 and not stopchars[self:get_char_at_pos(self.cursor_pos)] do
-    self.cursor_pos = self.cursor_pos - 1
-  end
-  if self.cursor_pos > 0 and self:get_char_at_pos(self.cursor_pos) == '\n' then
-    self.cursor_pos = self.cursor_pos - 1
-  end
-end
-
-function EditableTextBox:move_cursor_word_right()
-  if self.cursor_pos == self.chars then return end
-  if self:get_char_at_pos(self.cursor_pos + 1) == '\n' then
-    self.cursor_pos = self.cursor_pos + 1
-    return
-  end
-  while self.cursor_pos < self.chars
-      and self:get_char_at_pos(self.cursor_pos + 1) ~= '\n'
-      and stopchars[self:get_char_at_pos(self.cursor_pos + 1)] do
-    self.cursor_pos = self.cursor_pos + 1
-  end
-  while self.cursor_pos < self.chars and not stopchars[self:get_char_at_pos(self.cursor_pos + 1)] do
-    self.cursor_pos = self.cursor_pos + 1
+function EditableTextBox:move_cursor_word(dir)
+  if dir < 0 then
+    if self.cursor_pos == 0 then return end
+    if self:get_char_at_pos(self.cursor_pos) == '\n' then
+      self.cursor_pos = self.cursor_pos - 1
+      return
+    end
+    while self.cursor_pos > 0
+        and self:get_char_at_pos(self.cursor_pos) ~= '\n'
+        and stopchars[self:get_char_at_pos(self.cursor_pos)] do
+      self.cursor_pos = self.cursor_pos - 1
+    end
+    while self.cursor_pos > 0 and not stopchars[self:get_char_at_pos(self.cursor_pos)] do
+      self.cursor_pos = self.cursor_pos - 1
+    end
+    if self.cursor_pos > 0 and self:get_char_at_pos(self.cursor_pos) == '\n' then
+      self.cursor_pos = self.cursor_pos - 1
+    end
+  else
+    if self.cursor_pos == self.chars then return end
+    if self:get_char_at_pos(self.cursor_pos + 1) == '\n' then
+      self.cursor_pos = self.cursor_pos + 1
+      return
+    end
+    while self.cursor_pos < self.chars
+        and self:get_char_at_pos(self.cursor_pos + 1) ~= '\n'
+        and stopchars[self:get_char_at_pos(self.cursor_pos + 1)] do
+      self.cursor_pos = self.cursor_pos + 1
+    end
+    while self.cursor_pos < self.chars and not stopchars[self:get_char_at_pos(self.cursor_pos + 1)] do
+      self.cursor_pos = self.cursor_pos + 1
+    end
   end
 end
 
 function EditableTextBox:handle_enter(meta)
   self:append_char('\n')
-  self:maybe_move_cursor_down()
+  self:maybe_move_cursor(1)
 end
 
 function EditableTextBox:set_text(text)
@@ -1585,7 +1558,7 @@ function EditableTextBox:delete_char(at)
 
   self.chars = self.chars - 1
   self:move_cursor(at)
-  self:maybe_move_cursor_up()
+  self:maybe_move_cursor(-1)
 
   return true
 end

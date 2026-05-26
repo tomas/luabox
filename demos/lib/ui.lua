@@ -5,8 +5,8 @@ local Emitter = require('demos.lib.events')
 local ustring = require('demos.lib.ustring')
 
 local screen, window, stopped
-local box_count = 0
-local stopchars = '[ /#%.]'
+local tab_width = 8
+local stopchars = {[' ']=true, ['/']=true, ['#']=true, ['.']=true, ['%']=true, ['\n']=true}
 local page_move_ratio = 1.3
 local default_cursor_color = tb.RED
 
@@ -79,6 +79,114 @@ end
 local function contains_newline(str, stop)
   local subs = str:sub(0, stop)
   return subs:find('\n')
+end
+
+-------------------------------------------------------------
+-- string helpers
+
+local function utf8_char_len(b)
+  if b < 128 then return 1 end
+  if b < 224 then return 2 end
+  if b < 240 then return 3 end
+  return 4
+end
+
+local function find_stopchar(str, start_char_pos)
+  local len = #str
+  local char_pos = 1
+  local i = 1
+  while i <= len do
+    local b = string.byte(str, i)
+    if b < 128 then
+      if char_pos >= start_char_pos and stopchars[string.char(b)] then
+        return char_pos
+      end
+      i = i + 1
+    else
+      i = i + utf8_char_len(b)
+    end
+    char_pos = char_pos + 1
+  end
+  return nil
+end
+
+local function display_len(str)
+  local col = 0
+  local i = 1
+  local len = #str
+  while i <= len do
+    local b = string.byte(str, i)
+    if b == 9 then
+      col = col + (tab_width - (col % tab_width))
+      i = i + 1
+    else
+      col = col + 1
+      i = i + utf8_char_len(b)
+    end
+  end
+  return col
+end
+
+local function chars_for_width(str, max_col)
+  if max_col <= 0 then return 0 end
+  local col = 0
+  local byte_i = 1
+  local char_i = 0
+  local len = #str
+  while byte_i <= len do
+    local b = string.byte(str, byte_i)
+    local skip = (b == 9) and 1 or utf8_char_len(b)
+    local add = (b == 9) and (tab_width - (col % tab_width)) or 1
+    if col + add > max_col then return char_i end
+    col = col + add
+    char_i = char_i + 1
+    byte_i = byte_i + skip
+  end
+  return char_i
+end
+
+local function char_at_visual(str, target_col)
+  if target_col <= 0 then return 0 end
+  local col = 0
+  local byte_i = 1
+  local char_i = 0
+  local len = #str
+  while byte_i <= len do
+    local b = string.byte(str, byte_i)
+    local skip = (b == 9) and 1 or utf8_char_len(b)
+    local add = (b == 9) and (tab_width - (col % tab_width)) or 1
+    if col + add > target_col then return char_i end
+    col = col + add
+    char_i = char_i + 1
+    byte_i = byte_i + skip
+  end
+  return char_i
+end
+
+local function expand_line(str)
+  local out = {}
+  local col = 0
+  local i = 1
+  local len = #str
+  while i <= len do
+    local b = string.byte(str, i)
+    if b == 9 then
+      local n = tab_width - (col % tab_width)
+      out[#out + 1] = string.rep(' ', n)
+      col = col + n
+      i = i + 1
+    elseif b < 128 then
+      out[#out + 1] = string.char(b)
+      col = col + 1
+      i = i + 1
+    else
+      local clen = utf8_char_len(b)
+      out[#out + 1] = string.sub(str, i, i + clen - 1)
+      col = col + 1
+      i = i + clen
+    end
+  end
+  return table.concat(out)
 end
 
 -----------------------------------------
@@ -311,10 +419,11 @@ end
 ----------------
 
 local Box = Container:extend()
+Box.count = 0
 
 Box.next_id = function()
-  local curr = box_count
-  box_count = box_count + 1
+  local curr = Box.count
+  Box.count = Box.count + 1
   return "box " .. curr
 end
 
@@ -934,7 +1043,7 @@ function TextBox:render_self()
   for line_num = 0, (height+ypos) - 1, 1 do
     if ustring.len(str) <= 0 then break end
 
-    linebreak = string.find(str, '\n')
+    linebreak = ustring.find(str, '\n')
     if linebreak and linebreak <= width then
       line = ustring.sub(str, 0, linebreak - 1)
       limit = linebreak + 1
@@ -968,11 +1077,15 @@ function EditableTextBox:new(text, opts)
   EditableTextBox.super.new(self, text, opts or {})
   self.placeholder = opts.placeholder
   self.cursor_color = opts.cursor_color or default_cursor_color
+  self.show_scrollbar = opts.show_scrollbar
+  self.selection_anchor = nil
 
   self:on('key', function(key, char, meta)
     if char == '' or meta > 2 then
       self:handle_key(key, meta)
     else
+      self:save_undo()
+      self:delete_selection()
       self:append_char(char)
     end
     self:mark_changed()
@@ -1001,46 +1114,187 @@ function EditableTextBox:get_text()
   end
 end
 
+function EditableTextBox:delete_selection()
+  if not self.selection_anchor then return false end
+
+  local s, e = self.selection_anchor, self.cursor_pos
+  if s > e then s, e = e, s end
+  if s == e then
+    self.selection_anchor = nil
+    return false
+  end
+
+  local before = ustring.sub(self.text, 0, s)
+  local after  = ustring.sub(self.text, e + 1)
+  self.text = before .. after
+  self.chars = ustring.len(self.text)
+  self.cursor_pos = s
+  self.selection_anchor = nil
+  return true
+end
+
+function EditableTextBox:has_selection()
+  return self.selection_anchor ~= nil and self.selection_anchor ~= self.cursor_pos
+end
+
 function EditableTextBox:handle_key(key, meta)
   if key == tb.KEY_ENTER or key == tb.KEY_SHIFT_ENTER then
-    if key == tb.KEY_SHIFT_ENTER then
+    self:save_undo()
+    self:delete_selection()
+    if meta == tb.META_SHIFT then
       self:handle_enter(tb.META_SHIFT)
     else
       self:handle_enter(meta)
     end
   elseif key == tb.KEY_BACKSPACE or key == tb.KEY_CTRL_BACKSPACE then
-    if meta == tb.META_ALT or key == tb.KEY_CTRL_BACKSPACE then
+    self:save_undo()
+    if self:delete_selection() then
+      -- selection deleted, do nothing else
+    elseif meta == tb.META_ALT or key == tb.KEY_CTRL_BACKSPACE then
       self:delete_last_word()
     else
       self:delete_char(-1)
     end
   elseif key == tb.KEY_DELETE then
-    self:delete_char(0)
+    self:save_undo()
+    if not self:delete_selection() then
+      self:delete_char(0)
+    end
+  elseif key == tb.KEY_TAB then
+    self:save_undo()
+    self:delete_selection()
+    self:append_char('\t')
   elseif key == tb.KEY_HOME then
-    self:move_cursor_to_last('\n')
-  elseif (key == tb.KEY_CTRL_A and meta == tb.META_CTRL) then
-    self.cursor_pos = 0
-  elseif key == tb.KEY_END then
-    self:move_cursor_to_next('\n')
-  elseif (key == tb.KEY_CTRL_E and meta == tb.META_CTRL) then
-    self.cursor_pos = self.chars
-  elseif key == tb.KEY_ARROW_LEFT then
     if meta == tb.META_CTRL then
-      self:move_cursor_to_last(stopchars)
+      self.selection_anchor = nil
+      self.cursor_pos = 0
+      self:ensure_cursor_visible()
+    elseif meta == tb.META_SHIFT then
+      self.selection_anchor = self.selection_anchor or self.cursor_pos
+      self:move_cursor_to_last('\n')
+    else
+      self.selection_anchor = nil
+      self:move_cursor_to_last('\n')
+    end
+  elseif (key == tb.KEY_CTRL_A and meta == tb.META_CTRL) then
+    self.selection_anchor = 0
+    self.cursor_pos = self.chars
+  elseif key == tb.KEY_END then
+    if meta == tb.META_CTRL then
+      self.selection_anchor = nil
+      self.cursor_pos = self.chars
+      self:ensure_cursor_visible()
+    elseif meta == tb.META_SHIFT then
+      self.selection_anchor = self.selection_anchor or self.cursor_pos
+      self:move_cursor_to_next('\n')
+    else
+      self.selection_anchor = nil
+      self:move_cursor_to_next('\n')
+    end
+  elseif (key == tb.KEY_CTRL_E and meta == tb.META_CTRL) then
+    self.selection_anchor = nil
+    self.cursor_pos = self.chars
+  elseif (key == tb.KEY_CTRL_Z) and (meta == tb.META_CTRL or meta == tb.META_CTRLSHIFT) then
+    if meta == tb.META_CTRLSHIFT then
+      self:redo()
+    else
+      self:undo()
+    end
+  elseif (key == tb.KEY_CTRL_Y) and meta == tb.META_CTRL then
+    self:redo()
+  elseif key == tb.KEY_ARROW_LEFT then
+    if meta == tb.META_SHIFT or meta == tb.META_CTRLSHIFT then
+      self.selection_anchor = self.selection_anchor or self.cursor_pos
+    else
+      self.selection_anchor = nil
+    end
+    if meta == tb.META_CTRL or meta == tb.META_CTRLSHIFT then
+      self:move_cursor_word_left()
     else
       self:move_cursor_left()
     end
   elseif key == tb.KEY_ARROW_RIGHT then
-    if meta == tb.META_CTRL then
-      self:move_cursor_to_next(stopchars)
+    if meta == tb.META_SHIFT or meta == tb.META_CTRLSHIFT then
+      self.selection_anchor = self.selection_anchor or self.cursor_pos
+    else
+      self.selection_anchor = nil
+    end
+    if meta == tb.META_CTRL or meta == tb.META_CTRLSHIFT then
+      self:move_cursor_word_right()
     else
       self:move_cursor_right()
     end
-  elseif key == tb.KEY_ARROW_DOWN and meta == 0 then
+  elseif key == tb.KEY_ARROW_DOWN then
+    if meta == tb.META_SHIFT then
+      self.selection_anchor = self.selection_anchor or self.cursor_pos
+    else
+      self.selection_anchor = nil
+    end
     self:move_cursor_down()
-  elseif key == tb.KEY_ARROW_UP and meta == 0 then
+  elseif key == tb.KEY_ARROW_UP then
+    if meta == tb.META_SHIFT then
+      self.selection_anchor = self.selection_anchor or self.cursor_pos
+    else
+      self.selection_anchor = nil
+    end
     self:move_cursor_up()
+  elseif key == tb.KEY_PAGE_UP then
+    if meta == tb.META_SHIFT then
+      self.selection_anchor = self.selection_anchor or self.cursor_pos
+    else
+      self.selection_anchor = nil
+    end
+    self:move_cursor_page_up()
+    self:ensure_cursor_visible()
+  elseif key == tb.KEY_PAGE_DOWN then
+    if meta == tb.META_SHIFT then
+      self.selection_anchor = self.selection_anchor or self.cursor_pos
+    else
+      self.selection_anchor = nil
+    end
+    self:move_cursor_page_down()
+    self:ensure_cursor_visible()
   end
+end
+
+function EditableTextBox:pos_from_visual(col, target_line, width)
+  if not width then
+    local w, h = self:size()
+    width = round(w)
+  end
+
+  local remaining = self.text
+  local chars_consumed = 0
+
+  for line_idx = 0, target_line do
+    if ustring.len(remaining) <= 0 then
+      return math.min(self.chars, chars_consumed + col)
+    end
+
+    local linebreak = ustring.find(remaining, '\n')
+    local linebreak_visual = linebreak and (display_len(ustring.sub(remaining, 0, linebreak - 1)) + 1)
+    local line_len, advance
+
+    if linebreak and linebreak_visual <= width then
+      line_len = linebreak - 1
+      advance  = linebreak
+    else
+      line_len = chars_for_width(remaining, width)
+      if line_len == 0 then line_len = math.min(1, ustring.len(remaining)) end
+      advance  = math.max(line_len, 1)
+    end
+
+    if line_idx == target_line then
+      local line_sub = ustring.sub(remaining, 0, line_len)
+      local char_at = char_at_visual(line_sub, col)
+      return chars_consumed + math.min(char_at, line_len)
+    end
+
+    chars_consumed = chars_consumed + advance
+    remaining = ustring.sub(remaining, advance + 1)
+  end
+
+  return chars_consumed
 end
 
 function EditableTextBox:move_cursor(dir)
@@ -1065,41 +1319,147 @@ function EditableTextBox:maybe_move_cursor_up()
   local cursor_x, cursor_y = self:get_cursor_offset()
   if cursor_y == 0 and self.ypos > 0 then
     self:move(-1)
-    return
+    return true
   end
+  return false
 end
 
 function EditableTextBox:move_cursor_up()
-  if self:maybe_move_cursor_up() then
-    return true
+  local width = math.floor(self:size())
+
+  local cursor_x, cursor_y = self:get_cursor_offset(width)
+
+  if cursor_y <= 0 then
+    if self.ypos > 0 then
+      self:maybe_move_cursor_up()
+      cursor_x, cursor_y = self:get_cursor_offset(width)
+    else
+      return
+    end
   end
 
-  local width, height = self:size()
-  if not self:move_cursor(math.floor(width) * -1) then
-    self:move_cursor_to_last('\n')
-  end
+  local abs_line = cursor_y + self:get_ypos()
+  if abs_line <= 0 then return end
+
+  self.cursor_pos = self:pos_from_visual(cursor_x, abs_line - 1, width)
 end
 
 function EditableTextBox:maybe_move_cursor_down()
   local width, height = self:size()
-
   local cursor_x, cursor_y = self:get_cursor_offset()
 
-  if cursor_y >= height and self.nlines >= height then
+  if cursor_y >= height - 1 and self.nlines > height then
     self:move(1)
     return true
   end
+  return false
 end
 
 function EditableTextBox:move_cursor_down()
-  if self:maybe_move_cursor_down() then
-    return true
+  local width, height = self:size()
+  width = math.floor(width)
+
+  local cursor_x, cursor_y = self:get_cursor_offset(width)
+
+  if cursor_y >= height - 1 then
+    if self:maybe_move_cursor_down() then
+      cursor_x, cursor_y = self:get_cursor_offset(width)
+    else
+      return
+    end
   end
 
+  local abs_line = cursor_y + self:get_ypos()
+  self.cursor_pos = self:pos_from_visual(cursor_x, abs_line + 1, width)
+end
+
+function EditableTextBox:move_cursor_page_up()
   local width, height = self:size()
-  if not self:move_cursor(math.floor(width)) then
-    self:move_cursor_to_next('\n')
+  width = math.floor(width)
+  height = math.floor(height)
+  local page = math.max(1, math.floor(height / 2))
+
+  local cursor_x, cursor_y = self:get_cursor_offset(width)
+  local abs_line = cursor_y + self:get_ypos()
+  local target_line = math.max(0, abs_line - page)
+
+  self.cursor_pos = self:pos_from_visual(cursor_x, target_line, width)
+end
+
+function EditableTextBox:move_cursor_page_down()
+  local width, height = self:size()
+  width = math.floor(width)
+  height = math.floor(height)
+  local page = math.max(1, math.floor(height / 2))
+
+  local cursor_x, cursor_y = self:get_cursor_offset(width)
+  local abs_line = cursor_y + self:get_ypos()
+  local target_line = abs_line + page
+
+  self.cursor_pos = self:pos_from_visual(cursor_x, target_line, width)
+end
+
+function EditableTextBox:ensure_cursor_visible()
+  local width, height = self:size()
+  width = math.floor(width)
+  height = math.floor(height)
+  local _, cy = self:get_cursor_offset(width)
+
+  if cy < 0 then
+    self:move(cy)
+  elseif cy >= height then
+    self:move(cy - height + 1)
   end
+end
+
+function EditableTextBox:save_undo()
+  self.undo_stack = self.undo_stack or {}
+  self.redo_stack = self.redo_stack or {}
+  local last = self.undo_stack[#self.undo_stack]
+  if last and last.text == self.text then return end
+  table.insert(self.undo_stack, {
+    text = self.text,
+    chars = self.chars,
+    cursor_pos = self.cursor_pos,
+    selection_anchor = self.selection_anchor,
+  })
+  self.redo_stack = {}
+  if #self.undo_stack > 100 then
+    table.remove(self.undo_stack, 1)
+  end
+end
+
+function EditableTextBox:undo()
+  if not self.undo_stack or #self.undo_stack == 0 then return end
+  self.redo_stack = self.redo_stack or {}
+  table.insert(self.redo_stack, {
+    text = self.text,
+    chars = self.chars,
+    cursor_pos = self.cursor_pos,
+    selection_anchor = self.selection_anchor,
+  })
+  local state = table.remove(self.undo_stack)
+  self.text = state.text
+  self.chars = state.chars
+  self.cursor_pos = state.cursor_pos
+  self.selection_anchor = state.selection_anchor
+  self:mark_changed()
+end
+
+function EditableTextBox:redo()
+  if not self.redo_stack or #self.redo_stack == 0 then return end
+  table.insert(self.undo_stack, {
+    text = self.text,
+    chars = self.chars,
+    cursor_pos = self.cursor_pos,
+    selection_anchor = self.selection_anchor,
+  })
+  local state = table.remove(self.redo_stack)
+  self.text = state.text
+  self.chars = state.chars
+  self.cursor_pos = state.cursor_pos
+  self.selection_anchor = state.selection_anchor
+  self:mark_changed()
 end
 
 function EditableTextBox:move_cursor_to_beginning()
@@ -1111,19 +1471,76 @@ function EditableTextBox:move_cursor_to_end()
 end
 
 function EditableTextBox:move_cursor_to_last(char)
-  local reverse_cursor_pos = self.chars - self.cursor_pos
-  local lastpos = string.find(self.text:reverse(), char, reverse_cursor_pos+2)
-  if lastpos and lastpos - reverse_cursor_pos > 0 then
-    self:move_cursor(-(lastpos - reverse_cursor_pos - 1))
+  local search_fn
+  if type(char) == 'function' then
+    search_fn = char
+  else
+    search_fn = function(str, from)
+      return ustring.find(str, char, from)
+    end
+  end
+  local found_at = nil
+  local search_from = 1
+  while true do
+    local pos = search_fn(self.text, search_from)
+    if not pos or pos >= self.cursor_pos + 1 then break end
+    found_at = pos
+    search_from = pos + 1
+  end
+  if found_at then
+    self.cursor_pos = found_at
   else
     self:move_cursor_to_beginning()
   end
 end
 
 function EditableTextBox:move_cursor_to_next(char, insert_after)
-  local nextpos = string.find(self.text, char, self.cursor_pos+2)
+  local search_fn
+  if type(char) == 'function' then
+    search_fn = char
+  else
+    search_fn = function(str, from)
+      return ustring.find(str, char, from)
+    end
+  end
+  local nextpos = search_fn(self.text, self.cursor_pos + 2)
   local offset = insert_after and 0 or -1
   self.cursor_pos = nextpos and (nextpos + offset) or self.chars
+end
+
+function EditableTextBox:move_cursor_word_left()
+  if self.cursor_pos == 0 then return end
+  if self:get_char_at_pos(self.cursor_pos) == '\n' then
+    self.cursor_pos = self.cursor_pos - 1
+    return
+  end
+  while self.cursor_pos > 0
+      and self:get_char_at_pos(self.cursor_pos) ~= '\n'
+      and stopchars[self:get_char_at_pos(self.cursor_pos)] do
+    self.cursor_pos = self.cursor_pos - 1
+  end
+  while self.cursor_pos > 0 and not stopchars[self:get_char_at_pos(self.cursor_pos)] do
+    self.cursor_pos = self.cursor_pos - 1
+  end
+  if self.cursor_pos > 0 and self:get_char_at_pos(self.cursor_pos) == '\n' then
+    self.cursor_pos = self.cursor_pos - 1
+  end
+end
+
+function EditableTextBox:move_cursor_word_right()
+  if self.cursor_pos == self.chars then return end
+  if self:get_char_at_pos(self.cursor_pos + 1) == '\n' then
+    self.cursor_pos = self.cursor_pos + 1
+    return
+  end
+  while self.cursor_pos < self.chars
+      and self:get_char_at_pos(self.cursor_pos + 1) ~= '\n'
+      and stopchars[self:get_char_at_pos(self.cursor_pos + 1)] do
+    self.cursor_pos = self.cursor_pos + 1
+  end
+  while self.cursor_pos < self.chars and not stopchars[self:get_char_at_pos(self.cursor_pos + 1)] do
+    self.cursor_pos = self.cursor_pos + 1
+  end
 end
 
 function EditableTextBox:handle_enter(meta)
@@ -1133,7 +1550,10 @@ end
 
 function EditableTextBox:set_text(text)
   EditableTextBox.super.set_text(self, text)
-  self:move_cursor_to_end()
+  self.cursor_pos = 0
+  self.selection_anchor = nil
+  self.undo_stack = {}
+  self.redo_stack = {}
 end
 
 function EditableTextBox:append_char(char)
@@ -1166,15 +1586,20 @@ function EditableTextBox:delete_char(at)
 end
 
 function EditableTextBox:delete_last_word()
-  if self.cursor_pos > 0 and self:get_char_at_pos(self.cursor_pos - 1) == '\n' then
-    self:move_cursor_to_last('\n')
+  if self.cursor_pos > 0 and self:get_char_at_pos(self.cursor_pos) == '\n' then
+    self:delete_char(-1)
     return
   end
 
   local deleting = true
   while deleting do
-    if self:delete_char(-1) == false or string.find(self:get_char_at_pos(self.cursor_pos), stopchars) == 1 then
+    if self:delete_char(-1) == false then
       deleting = false
+    elseif self.cursor_pos > 0 then
+      local ch = self:get_char_at_pos(self.cursor_pos)
+      if ch == '\n' or stopchars[ch] then
+        deleting = false
+      end
     end
   end
 end
@@ -1186,49 +1611,40 @@ function EditableTextBox:get_cursor_offset(width)
   end
 
   local pos = self.cursor_pos
-  local str = ustring.sub(self.text, 0, pos)
+  local remaining = self.text
+  local chars_consumed = 0
 
-  if pos < width and not contains_newline(str, width-1) then
-    return pos, 0
-  end
+  for line_idx = 0, math.huge do
+    if ustring.len(remaining) <= 0 then
+      local visual_x = display_len(ustring.sub(remaining, 0, pos - chars_consumed))
+      return visual_x, line_idx - self:get_ypos()
+    end
 
-  local x, y, line = 0, 0, nil
-  local n, chars, limit, nextbreak = 0, 0, 0
-  while ustring.len(str) > 0 do
+    local linebreak = ustring.find(remaining, '\n')
+    local linebreak_visual = linebreak and (display_len(ustring.sub(remaining, 0, linebreak - 1)) + 1)
+    local line_len, advance
 
-    nextbreak = string.find(str, '\n')
-    if nextbreak and nextbreak <= width then
-      line  = ustring.sub(str, 0, nextbreak-1)
-      limit = nextbreak + 1
-      chars = chars + nextbreak
+    if linebreak and linebreak_visual <= width then
+      line_len = linebreak - 1
+      advance  = linebreak
     else
-      line = ustring.sub(str, 0, width)
-      limit = width + 1
-      chars = chars + width
+      line_len = chars_for_width(remaining, width)
+      if line_len == 0 then line_len = math.min(1, ustring.len(remaining)) end
+      advance  = math.max(line_len, 1)
     end
 
-    n = n + 1
-    str = ustring.sub(str, limit)
-    -- debug(string.format("chars: %d, pos: %d, width: %d, break: %d, line len: %d", chars, pos, width, nextbreak or '-1', line:len()))
+    local line_start = chars_consumed
 
-    if chars == pos then
-      y = n
-      x = 0
-      break
-    elseif (chars < pos and chars + ustring.len(line) > pos) then
-      if not contains_newline(str, pos - chars) then
-        y = n
-        x = pos - chars
-        break
-      end
-    elseif chars > pos then
-      y = n-1
-      x = ustring.len(line)
-      break
+    if pos <= line_start + line_len then
+      local line_prefix = ustring.sub(remaining, 0, pos - line_start)
+      return display_len(line_prefix), line_idx - self:get_ypos()
     end
+
+    chars_consumed = chars_consumed + advance
+    remaining = ustring.sub(remaining, advance + 1)
   end
 
-  return x, (y - self:get_ypos())
+  return 0, 0
 end
 
 function EditableTextBox:get_char_at_pos(pos)
@@ -1239,18 +1655,24 @@ function EditableTextBox:render_cursor()
   local x, y = self:offset()
   local fg, bg = self:colors()
   local width, height = self:size()
+  width = math.floor(width)
 
-  local cursor_x, cursor_y = self:get_cursor_offset(math.floor(width))
+  local cursor_x, cursor_y = self:get_cursor_offset(width)
   local char = self:get_char_at_pos(self.cursor_pos+1)
 
   if cursor_y >= height then
     return -- don't render cursor, we're off limits
   end
 
+  -- clamp cursor to widget bounds to avoid rendering past the edge
+  if cursor_x >= width then
+    cursor_x = width - 1
+  end
+
   if window:is_focused() then
     if cursor_blink_on then
       -- blink-on phase: filled block cursor drawn over the character
-      tb.string(x + cursor_x, y + cursor_y, fg, self.cursor_color, (char == '' or char == '\n') and ' ' or char)
+      tb.string(x + cursor_x, y + cursor_y, fg, self.cursor_color, (char == '' or char == '\n' or char == '\t') and ' ' or char)
     end
   else
     tb.string(x + cursor_x, y + cursor_y, self.cursor_color, bg, '░') -- U+25A1 □
@@ -1258,9 +1680,130 @@ function EditableTextBox:render_cursor()
 end
 
 function EditableTextBox:render_self()
-  EditableTextBox.super.render_self(self)
+  self:clear()
+
+  local ypos = self:get_ypos()
+  local offset_x, offset_y = self:offset()
+  local fg, bg = self:colors()
+  local width, height = self:size()
+  width = math.floor(width)
+
+  local text_width = width
+
+  local nlines = 0
+  local remaining = self.text
+  local chars_before = 0
+  local sel_start, sel_end
+
+  if self:has_selection() then
+    sel_start = math.min(self.selection_anchor, self.cursor_pos)
+    sel_end   = math.max(self.selection_anchor, self.cursor_pos)
+  end
+
+  for vis_line = 0, height + ypos - 1 do
+    if #remaining <= 0 then break end
+
+    local linebreak = ustring.find(remaining, '\n')
+    local linebreak_visual = linebreak and (display_len(ustring.sub(remaining, 0, linebreak - 1)) + 1)
+    local line, limit, line_len
+
+    if linebreak and linebreak_visual <= text_width then
+      line_len = linebreak - 1
+      line  = ustring.sub(remaining, 0, line_len)
+      limit = linebreak + 1
+    else
+      line_len = chars_for_width(remaining, text_width)
+      if line_len == 0 then line_len = math.min(1, ustring.len(remaining)) end
+      if line_len >= ustring.len(remaining) then
+        line = remaining
+      else
+        line = ustring.sub(remaining, 0, line_len)
+      end
+      limit = line_len + 1
+    end
+
+    if vis_line >= ypos then
+      local screen_y = offset_y + vis_line - ypos
+
+      if sel_start and sel_end and sel_end > chars_before and sel_start < chars_before + line_len then
+        local before_chars = math.max(0, sel_start - chars_before)
+        local sel_from_chars = math.max(0, sel_start - chars_before)
+        local sel_to_chars = math.min(line_len, sel_end - chars_before)
+
+        local expanded = expand_line(line)
+        local before_visual = display_len(ustring.sub(line, 0, before_chars))
+        local sel_from_visual = display_len(ustring.sub(line, 0, sel_from_chars))
+        local sel_to_visual = display_len(ustring.sub(line, 0, sel_to_chars))
+        local line_visual_len = display_len(line)
+        local off = 0
+
+        if before_visual > 0 then
+          local before_text = ustring.sub(expanded, 0, before_visual)
+          tb.string(offset_x, screen_y, fg, bg, before_text)
+          off = off + ustring.len(before_text)
+        end
+
+        if sel_to_visual > sel_from_visual then
+          local sel_text = ustring.sub(expanded, sel_from_visual + 1, sel_to_visual)
+          tb.string(offset_x + off, screen_y, tb.BLACK, tb.WHITE, sel_text)
+          off = off + ustring.len(sel_text)
+        end
+
+        if off < line_visual_len then
+          local after_text = ustring.sub(expanded, off + 1)
+          tb.string(offset_x + off, screen_y, fg, bg, after_text)
+        end
+      else
+        tb.string(offset_x, screen_y, fg, bg, expand_line(line))
+      end
+    end
+
+    chars_before = chars_before + line_len
+    if linebreak and linebreak_visual and linebreak_visual <= text_width then
+      chars_before = chars_before + 1
+    end
+
+    remaining = ustring.sub(remaining, limit)
+    nlines = nlines + 1
+  end
+
+  -- count remaining visual lines for accurate nlines
+  while ustring.len(remaining) > 0 do
+    local linebreak = ustring.find(remaining, '\n')
+    local linebreak_visual = linebreak and (display_len(ustring.sub(remaining, 0, linebreak - 1)) + 1)
+    local advance
+    if linebreak and linebreak_visual <= text_width then
+      advance = linebreak
+    else
+      advance = chars_for_width(remaining, text_width)
+      if advance == 0 then advance = math.min(1, ustring.len(remaining)) end
+    end
+    remaining = ustring.sub(remaining, advance + 1)
+    nlines = nlines + 1
+  end
+
+  self.nlines = nlines + 1
+
+  if needs_scrollbar and self.nlines > height then
+    local sx = offset_x + width - 1
+    local track_h = math.floor(height)
+    local total = self.nlines
+    local visible = height
+    local max_scroll = math.max(1, total - visible)
+    local thumb_h = math.max(1, math.floor(visible * visible / total))
+    local thumb_pos = math.floor((self.ypos / max_scroll) * (track_h - thumb_h))
+
+    for sy = 0, track_h - 1 do
+      if sy >= thumb_pos and sy < thumb_pos + thumb_h then
+        tb.char(sx, offset_y + sy, fg, bg, '█')
+      else
+        tb.char(sx, offset_y + sy, fg, bg, '│')
+      end
+    end
+  end
+
   if self:is_focused() then
-    self:render_cursor(true)
+    self:render_cursor()
     self.changed = true
   end
 end

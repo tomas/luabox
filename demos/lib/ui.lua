@@ -1079,8 +1079,9 @@ function EditableTextBox:new(text, opts)
   self.cursor_color = opts.cursor_color or default_cursor_color
   self.show_scrollbar = opts.show_scrollbar
   self.selection_anchor = nil
-  self.selection_fg = opts.selection_fg or tb.REVERSE
-  self.selection_bg = opts.selection_bg or tb.REVERSE
+  self.selection_fg = opts.selection_fg or tb.BLACK
+  self.selection_bg = opts.selection_bg or tb.LIGHT_GREY
+  self.skip_tab = opts.skip_tab
 
   self:on('key', function(key, char, meta)
     if char == '' or meta > 2 then
@@ -1163,9 +1164,11 @@ function EditableTextBox:handle_key(key, meta)
       self:delete_char(0)
     end
   elseif key == tb.KEY_TAB then
-    self:save_undo()
-    self:delete_selection()
-    self:append_char('\t')
+    if not self.skip_tab then
+      self:save_undo()
+      self:delete_selection()
+      self:append_char('\t')
+    end
   elseif key == tb.KEY_HOME then
     if meta == tb.META_CTRL then
       self.selection_anchor = nil
@@ -1691,8 +1694,9 @@ function EditableTextBox:render_self()
   width = math.floor(width)
 
   local text_width = width
+
   local nlines = 0
-  local remaining = self.text
+  local remaining = self.chars == 0 and self.placeholder or self.text
   local chars_before = 0
   local sel_start, sel_end
 

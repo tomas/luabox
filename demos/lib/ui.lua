@@ -1079,6 +1079,8 @@ function EditableTextBox:new(text, opts)
   self.cursor_color = opts.cursor_color or default_cursor_color
   self.show_scrollbar = opts.show_scrollbar
   self.selection_anchor = nil
+  self.selection_fg = opts.selection_fg or tb.REVERSE
+  self.selection_bg = opts.selection_bg or tb.REVERSE
 
   self:on('key', function(key, char, meta)
     if char == '' or meta > 2 then
@@ -1689,7 +1691,6 @@ function EditableTextBox:render_self()
   width = math.floor(width)
 
   local text_width = width
-
   local nlines = 0
   local remaining = self.text
   local chars_before = 0
@@ -1745,7 +1746,7 @@ function EditableTextBox:render_self()
 
         if sel_to_visual > sel_from_visual then
           local sel_text = ustring.sub(expanded, sel_from_visual + 1, sel_to_visual)
-          tb.string(offset_x + off, screen_y, tb.BLACK, tb.WHITE, sel_text)
+          tb.string(offset_x + off, screen_y, self.selection_fg, self.selection_bg, sel_text)
           off = off + ustring.len(sel_text)
         end
 

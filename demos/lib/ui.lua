@@ -1144,7 +1144,8 @@ function EditableTextBox:handle_key(key, meta)
   if key == tb.KEY_ENTER or key == tb.KEY_SHIFT_ENTER then
     self:save_undo()
     self:delete_selection()
-    if meta == tb.META_SHIFT then
+    -- if meta == tb.META_SHIFT then
+    if key == tb.KEY_SHIFT_ENTER then
       self:handle_enter(tb.META_SHIFT)
     else
       self:handle_enter(meta)

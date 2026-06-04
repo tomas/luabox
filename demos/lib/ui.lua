@@ -2069,6 +2069,21 @@ function List:render_item(formatted, x, y, fg, bg)
   tb.string(x, y, fg, bg, formatted)
 end
 
+function List:render_line(item, index, rounded_width, x, y, fg, bg)
+  local formatted = self:format_item(item)
+  local final     = self:fix_encoding(formatted)
+  local diff      = rounded_width - self:get_line_length(final)
+
+  if diff >= 0 then -- line is shorter than width
+    final = final -- .. string.rep(' ', diff)
+  else -- line is longer, so cut!
+    final = self:slice_line(final, rounded_width-1) .. '…'
+    diff = 0
+  end
+
+  self:render_item(final, self.align_right and (x + diff) or x, y, self:item_fg_color(index, item, fg), self:item_bg_color(index, item, bg), self:is_selected(index), rounded_width-1)
+end
+
 function List:render_self()
   if not self.changed_line_from then
     self:clear()
@@ -2099,19 +2114,7 @@ function List:render_self()
     if not skip_render then
       item = self:get_item(index)
       if not item then break end
-
-      formatted = self:format_item(item)
-      final     = self:fix_encoding(formatted)
-      diff      = width - self:get_line_length(final)
-
-      if diff >= 0 then -- line is shorter than width
-        final = final -- .. string.rep(' ', diff)
-      else -- line is longer, so cut!
-        final = self:slice_line(final, rounded_width-1) .. '…'
-        diff = 0
-      end
-
-      self:render_item(final, self.align_right and (x + diff) or x, y + line, self:item_fg_color(index, item, fg), self:item_bg_color(index, item, bg), self:is_selected(index), rounded_width-1)
+      self:render_line(item, index, rounded_width, x, y + line, fg, bg)
     end
   end
 
